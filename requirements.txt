@@ -19,6 +19,7 @@ crawl4ai>=0.2.0
 
 # Search and reranking
 jina>=3.0.0
+langchain-tavily>=0.1.0
 
 # UI
 gradio>=4.0.0

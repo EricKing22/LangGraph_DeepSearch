@@ -25,6 +25,7 @@ dependencies = [
     "crawl4ai>=0.2.0",
     "jina>=3.0.0",
     "gradio>=4.0.0",
+    "langchain_tavily>=0.1.0"
 ]
 
 [project.optional-dependencies]

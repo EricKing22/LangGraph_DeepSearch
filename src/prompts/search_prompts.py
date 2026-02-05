@@ -17,6 +17,14 @@ Format your response in a clear, readable manner with:
 - Source attribution where relevant
 - Any caveats or limitations
 
+Sources:
+{sources}
+
+Reference your sources professionally in IEEE reference style for example:
+
+[1] ... \n
+[2] ... \n
+
 Answer:"""
 
 
