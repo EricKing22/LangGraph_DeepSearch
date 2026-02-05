@@ -7,8 +7,8 @@ Query: {query}
 Context from web sources:
 {context}
 
-Please provide a comprehensive, well-structured answer to the query based on the context above. 
-Include specific information, facts, and data from the sources. If the sources don't contain 
+Please provide a comprehensive, well-structured answer to the query based on the context above.
+Include specific information, facts, and data from the sources. If the sources don't contain
 enough information to fully answer the query, acknowledge this limitation.
 
 Format your response in a clear, readable manner with:
@@ -20,7 +20,7 @@ Format your response in a clear, readable manner with:
 Answer:"""
 
 
-SEARCH_QUERY_PROMPT = """Given the user's question, generate an optimized search query that will 
+SEARCH_QUERY_PROMPT = """Given the user's question, generate an optimized search query that will
 find the most relevant information.
 
 User Question: {question}
