@@ -3,7 +3,7 @@ Tavily 搜索工具模块
 """
 from typing import List, Dict, Any, Literal
 from langchain_tavily import TavilySearch  # updated 1.0
-from src import config
+import config
 
 SearchDepth = Literal["basic", "advanced", "fast", "ultra-fast"]
 
@@ -117,7 +117,9 @@ if config.TAVILY_API_KEY:
         print(f"Warning: Failed to initialize Tavily search tool: {e}")
 
 
-def search_tavily(query: str, max_results: int) -> List[Dict[str, str]]:
+def search_tavily(
+    query: str, max_results: int = config.MAX_SEARCH_RESULTS
+) -> List[Dict[str, str]]:
     """
     便捷的搜索函数
 

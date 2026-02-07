@@ -1,4 +1,4 @@
-from typing import TypedDict, List, Dict, Any, Annotated
+from typing import TypedDict, List, Dict, Annotated
 from langgraph.graph import MessagesState
 import operator
 
@@ -11,15 +11,23 @@ class Source(TypedDict):
     content: str  # 来源内容摘要或全文
 
 
-class Question(MessagesState):
-    """每次搜索的状态"""
+class Search(MessagesState):
+    query: str  # 搜索问题
+    search_results: Annotated[List[Dict[str, str]], operator.add]  # 搜索结果列表，每个
+    sources: Annotated[List[Source], operator.add]  # 用于生成搜索结果的来源信息
+    is_completed: bool  # 是否完成搜索
 
+
+class Question(MessagesState):
     query: str  # 用户输入的原始查询
     questions: List[str]  # 分解后的查询列表
+    next_step_reason: str | None  # 分解原因
+    break_questions_iterations_count: int  # 分解查询的迭代次数
     human_feedback: str | None  # 人工反馈
-    context: List[Dict[str, Any]]  # 素材
+    search_results: Annotated[List[Dict[str, str]], operator.add]  # 素材
     sources: Annotated[List[Source], operator.add]  # 用于生成搜索结果的来源信息
     summary: str  # 搜索结果的总结
+    is_completed: bool  # 是否完成
 
 
 class Paragraph(TypedDict):

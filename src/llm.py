@@ -1,6 +1,6 @@
 from langchain_openai import ChatOpenAI
 from langchain_ollama import ChatOllama
-from src import config
+import config
 
 # 初始化 OpenAI LLM
 openai_llm = ChatOpenAI(
@@ -9,11 +9,18 @@ openai_llm = ChatOpenAI(
     api_key=config.OPENAI_API_KEY,
 )
 
+qwen_llm = ChatOpenAI(
+    model=config.QWEN_MODEL,
+    temperature=config.QWEN_TEMPERATURE,
+    api_key=config.QWEN_API_KEY,
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+)
+
 minmax_llm = ChatOpenAI(
     model=config.MINMAX_MODEL,
     temperature=config.MINMAX_TEMPERATURE,
     api_key=config.MINMAX_API_KEY,
-    base_url="https://api.minmax.com/v1",
+    base_url="https://api.minimax.io/v1",
 )
 
 ollama_llm = ChatOllama(

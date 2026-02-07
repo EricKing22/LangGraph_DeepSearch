@@ -39,7 +39,7 @@ QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen-plus")
 QWEN_TEMPERATURE = get_float("QWEN_TEMPERATURE", 0.7)
 
 MINMAX_API_KEY = os.getenv("MINMAX_API_KEY", "")
-MINMAX_MODEL = os.getenv("MINMAX_MODEL", "abab6.5s-chat")
+MINMAX_MODEL = os.getenv("MINMAX_MODEL", "MiniMax-M2.1")
 MINMAX_TEMPERATURE = get_float("MINMAX_TEMPERATURE", 0.7)
 
 # Tools
@@ -53,8 +53,9 @@ SEARXNG_ENABLED = get_bool("SEARXNG_ENABLED", False)
 WOLFRAM_APP_ID = os.getenv("WOLFRAM_APP_ID", "")
 
 # Search
-MAX_SEARCH_RESULTS = get_int("MAX_SEARCH_RESULTS", 10)
-SEARCH_TIMEOUT = get_int("SEARCH_TIMEOUT", 10)
+MAX_SUB_QUESTIONS: int = get_int("MAX_SUB_QUESTIONS", 5)
+MAX_SEARCH_RESULTS: int = get_int("MAX_SEARCH_RESULTS", 5)
+SEARCH_TIMEOUT: int = get_int("SEARCH_TIMEOUT", 10)
 
 # Scraping
 SCRAPING_STRATEGY = os.getenv("SCRAPING_STRATEGY", "crawl4ai")
