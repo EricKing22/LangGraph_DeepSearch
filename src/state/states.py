@@ -4,45 +4,51 @@ import operator
 
 
 class Source(TypedDict):
-    """每个来源的信息"""
+    """Information for each source"""
 
-    title: str  # 来源标题
-    url: str  # 来源URL
-    content: str  # 来源内容摘要或全文
+    title: str  # Source title
+    url: str  # Source URL
+    content: str  # Source content summary or full text
 
 
 class Search(MessagesState):
-    query: str  # 搜索问题
-    search_results: Annotated[List[Dict[str, str]], operator.add]  # 搜索结果列表，每个
-    sources: Annotated[List[Source], operator.add]  # 用于生成搜索结果的来源信息
-    is_completed: bool  # 是否完成搜索
+    query: str  # Search query
+    search_results: Annotated[
+        List[Dict[str, str]], operator.add
+    ]  # List of search results
+    sources: Annotated[
+        List[Source], operator.add
+    ]  # Source information used to generate search results
 
 
 class Question(MessagesState):
-    query: str  # 用户输入的原始查询
-    questions: List[str]  # 分解后的查询列表
-    next_step_reason: str | None  # 分解原因
-    break_questions_iterations_count: int  # 分解查询的迭代次数
-    human_feedback: str | None  # 人工反馈
-    search_results: Annotated[List[Dict[str, str]], operator.add]  # 素材
-    sources: Annotated[List[Source], operator.add]  # 用于生成搜索结果的来源信息
-    summary: str  # 搜索结果的总结
-    is_completed: bool  # 是否完成
+    query: str  # User's original query
+    questions: List[str]  # List of decomposed queries
+    next_step_reason: str | None  # Reason for decomposition
+    break_questions_iterations_count: int  # Number of iterations for query decomposition
+    human_feedback: str | None  # Human feedback
+    search_results: Annotated[List[Dict[str, str]], operator.add]  # Search materials
+    sources: Annotated[
+        List[Source], operator.add
+    ]  # Source information used to generate search results
+    summary: str  # Summary of search results
 
 
 class Paragraph(TypedDict):
-    """报告中的每个段落的状态"""
+    """State for each paragraph in the report"""
 
-    title: str  # 段落标题
-    content: str  # 段落内容
-    sources: Annotated[List[Source], operator.add]  # 用于生成该段落的来源信息
+    title: str  # Paragraph title
+    content: str  # Paragraph content
+    sources: Annotated[
+        List[Source], operator.add
+    ]  # Source information used to generate this paragraph
 
 
 class AgentState(TypedDict):
-    """整个报告的状态"""
+    """State for the entire report"""
 
-    query: str  # 原始查询
-    report_title: str  # 报告标题
+    query: str  # Original query
+    report_title: str  # Report title
     paragraphs: List[Paragraph]
-    final_report: str  # 最终报告内容
-    is_completed: bool  # 是否完成
+    final_report: str  # Final report content
+    is_completed: bool  # Whether completed

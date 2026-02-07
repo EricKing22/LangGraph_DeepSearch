@@ -1,10 +1,10 @@
 """
-配置管理模块 - 从 .env 文件加载环境变量
+Configuration management module - Load environment variables from .env file
 """
 import os
 from dotenv import load_dotenv
 
-# 加载 .env 文件
+# Load .env file
 load_dotenv()
 
 

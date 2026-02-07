@@ -60,7 +60,6 @@ Don't have repeated references. For example this is wrong:
 Make sure to include all relevant sources in your answer
 
 **Always answer in the same language as the query.**
-**如果使用中问提问，回答也请使用中文。**
 Answer:
 """
 

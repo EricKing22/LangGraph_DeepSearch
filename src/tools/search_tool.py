@@ -1,5 +1,5 @@
 """
-Tavily 搜索工具模块
+Tavily search tool module
 """
 from typing import List, Dict, Any, Literal
 from langchain_tavily import TavilySearch  # updated 1.0
@@ -9,15 +9,15 @@ SearchDepth = Literal["basic", "advanced", "fast", "ultra-fast"]
 
 
 class TavilySearchTool:
-    """Tavily 搜索工具包装类"""
+    """Tavily search tool wrapper class"""
 
     def __init__(self, api_key: str, max_results: int):
         """
-        初始化 Tavily 搜索工具
+        Initialize Tavily search tool
 
         Args:
-            api_key: Tavily API Key，如果不提供则从配置读取
-            max_results: 默认返回的最大结果数
+            api_key: Tavily API Key, read from config if not provided
+            max_results: Default maximum number of results to return
         """
         self.api_key = api_key or config.TAVILY_API_KEY
         if not self.api_key:
@@ -38,23 +38,23 @@ class TavilySearchTool:
         include_images: bool = False,
     ) -> Dict[str, Any]:
         """
-        执行搜索查询
+        Execute search query
 
         Args:
-            query: 搜索查询字符串
-            max_results: 返回的最大结果数
-            search_depth: 搜索深度 ("basic" 或 "advanced")
-            include_answer: 是否包含 AI 生成的答案
-            include_raw_content: 是否包含原始网页内容
-            include_images: 是否包含相关图片
+            query: Search query string
+            max_results: Maximum number of results to return
+            search_depth: Search depth ("basic" or "advanced")
+            include_answer: Whether to include AI-generated answer
+            include_raw_content: Whether to include raw webpage content
+            include_images: Whether to include related images
 
         Returns:
-            包含搜索结果的字典
+            Dictionary containing search results
         """
         max_results = max_results or self.max_results
 
         try:
-            # TavilySearch.invoke() 返回结果列表
+            # TavilySearch.invoke() returns result list
             raw_results = self.client.invoke(
                 query,
                 max_results=max_results,
@@ -64,19 +64,19 @@ class TavilySearchTool:
                 include_images=include_images,
             )
 
-            # 包装成与原 TavilyClient 兼容的格式
-            # 处理不同的返回格式
+            # Wrap into format compatible with original TavilyClient
+            # Handle different return formats
             if isinstance(raw_results, dict):
-                # 如果已经是字典格式，直接返回
+                # If already in dictionary format, return directly
                 if "results" in raw_results:
                     return raw_results
-                # 如果是单个结果，包装成列表
+                # If single result, wrap into list
                 return {"query": query, "results": [raw_results]}
             elif isinstance(raw_results, list):
-                # 如果是列表，包装成标准格式
+                # If list, wrap into standard format
                 return {"query": query, "results": raw_results}
             else:
-                # 如果是字符串或其他格式，包装成单个结果
+                # If string or other format, wrap into single result
                 return {"query": query, "results": [{"content": str(raw_results)}]}
 
         except Exception as e:
@@ -84,13 +84,13 @@ class TavilySearchTool:
 
     def extract_results(self, response: Dict[str, Any]) -> List[Dict[str, str]]:
         """
-        从 Tavily 响应中提取结构化结果
+        Extract structured results from Tavily response
 
         Args:
-            response: Tavily API 响应
+            response: Tavily API response
 
         Returns:
-            结构化的搜索结果列表
+            List of structured search results
         """
         results = []
 
@@ -106,7 +106,7 @@ class TavilySearchTool:
         return results
 
 
-# 创建全局实例（如果 API key 可用）
+# Create global instance (if API key is available)
 tavily_search = None
 if config.TAVILY_API_KEY:
     try:
@@ -121,14 +121,14 @@ def search_tavily(
     query: str, max_results: int = config.MAX_SEARCH_RESULTS
 ) -> List[Dict[str, str]]:
     """
-    便捷的搜索函数
+    Convenience search function
 
     Args:
-        query: 搜索查询
-        max_results: 最大结果数
+        query: Search query
+        max_results: Maximum number of results
 
     Returns:
-        搜索结果列表
+        List of search results
     """
     if not tavily_search:
         raise RuntimeError("Tavily search tool is not initialized")

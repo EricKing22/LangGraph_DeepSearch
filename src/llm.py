@@ -2,7 +2,6 @@ from langchain_openai import ChatOpenAI
 from langchain_ollama import ChatOllama
 import config
 
-# 初始化 OpenAI LLM
 openai_llm = ChatOpenAI(
     model=config.OPENAI_MODEL,
     temperature=config.OPENAI_TEMPERATURE,

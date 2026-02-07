@@ -3,6 +3,7 @@ from .question_nodes import (
     answer_directly,
     summarise,
     should_break_query,
+    extract_query,
 )
 
 from .search_nodes import (
@@ -16,4 +17,5 @@ __all__ = [
     "answer_directly",
     "summarise",
     "should_break_query",
+    "extract_query",
 ]

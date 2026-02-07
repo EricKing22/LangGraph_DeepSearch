@@ -1,20 +1,28 @@
 from langgraph.graph import StateGraph, START, END
 from state import Question
-from nodes import create_questions, search_web, summarise, should_break_query
+from nodes.question_nodes import (
+    create_questions,
+    summarise,
+    should_break_query,
+    extract_query,
+)
+from nodes.search_nodes import search_web
 
 
 # Build the graph
 builder = StateGraph(state_schema=Question)
 
 # Add nodes
+builder.add_node("extract_query", extract_query)
 builder.add_node("create_questions", create_questions)
 builder.add_node("search_web", search_web)
 builder.add_node("summarise", summarise)
 
 # Add edges
+builder.add_edge(START, "extract_query")
 # Start: decide whether to break query or search directly
 builder.add_conditional_edges(
-    START, should_break_query, ["search_web", "create_questions"]
+    "extract_query", should_break_query, ["search_web", "create_questions"]
 )
 
 # After creating questions: decide whether to improve questions or proceed to search

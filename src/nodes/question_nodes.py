@@ -1,17 +1,54 @@
 from pydantic import BaseModel, Field
 from state import Question
 from typing import List
-from llm import qwen_llm as llm
+from llm import ollama_llm as llm
 from langgraph.types import Send
 from langchain.messages import SystemMessage, HumanMessage, AIMessage
 from prompts import BREAK_QUESTIONS_PROMPT, SYNTHESIS_PROMPT
 from src import config
 
 
+def extract_query(state: Question):
+    def extract_text_content(content):
+        """Safely extract text from message content (handles both str and list formats)"""
+        if isinstance(content, str):
+            return content
+
+        if isinstance(content, list):
+            # Extract text from content blocks
+            texts = []
+            for block in content:
+                if isinstance(block, dict):
+                    if block.get("type") == "text":
+                        texts.append(block.get("text", ""))
+                elif isinstance(block, str):
+                    texts.append(block)
+            return " ".join(texts).strip()
+
+        # Fallback
+        return str(content)
+
+    """Extract query from the most recent HumanMessage"""
+    # Extract from message history (overrides old query)
+    messages = state.get("messages", [])
+    for message in reversed(messages):
+        if isinstance(message, HumanMessage):
+            query = extract_text_content(message.content)
+            if query:
+                return {"query": query}
+
+    # If no HumanMessage found, use existing query
+    existing_query = state.get("query", "")
+    if existing_query:
+        return {"query": existing_query}
+
+    raise ValueError("No query found in state")
+
+
 def create_questions(state: Question):
     """
-    根据用户输入的原始查询，生成分解后的查询列表。
-    使用LLM生成多个子查询，以便在后续步骤中分别搜索和分析。
+    Generate a list of sub-questions based on user's original query.
+    Uses LLM to generate multiple sub-queries for separate search and analysis in subsequent steps.
     """
     print("Creating sub-questions")
 
@@ -52,6 +89,7 @@ def create_questions(state: Question):
 
     # Update state
     return {
+        "query": query,
         "break_questions_iterations_count": state.get(
             "break_questions_iterations_count", 0
         )
@@ -67,7 +105,7 @@ def create_questions(state: Question):
 
 def should_break_query(state: Question):
     """
-    根据人工反馈决定下一步：
+    Decide the next step based on human feedback.
     """
     human_feedback = state.get("human_feedback", "")
 
@@ -84,7 +122,18 @@ def should_break_query(state: Question):
         )
 
     structured_router = llm.with_structured_output(Router)
-    query = state["query"]
+
+    # Extract query from state or messages
+    query = state.get("query", "")
+    if not query:
+        for message in reversed(state.get("messages", [])):
+            if isinstance(message, HumanMessage):
+                query = message.content
+                break
+
+    if not query:
+        raise ValueError("No query found in state or message history")
+
     questions = state.get("questions", [])
 
     messages = [HumanMessage(content=query)]
@@ -98,19 +147,15 @@ def should_break_query(state: Question):
     if human_feedback:
         messages.append(HumanMessage(content=f"Human Feedback: {human_feedback}"))
 
-    messages.extend(
-        [
-            HumanMessage(
-                content="Based on the above information, decide the next step. "
-                "If you are happy with the current sub questions return 'search_web' in 'next_step'. "
-                "If you need to create more or rewrite sub-questions based on human feedback, return 'create_questions' in 'next_step'."
-                "You should put your reasoning in the 'reason' field, use question index to help understanding."
-                f"Remember the max number of sub questions shouldn't exceed {config.MAX_SUB_QUESTIONS}."
-            ),
-            SystemMessage(
-                content="Your response should be in JSON format with 'next_step' and 'reason' fields."
-            ),
-        ]
+    messages.append(
+        SystemMessage(
+            content="Based on the above information, decide the next step. "
+            "If you are happy with the current sub questions return 'search_web' in 'next_step'. "
+            "If you need to create more or rewrite sub-questions based on human feedback, return 'create_questions' in 'next_step'."
+            "You should put your reasoning in the 'reason' field, use question index to help understanding."
+            f"Remember the max number of sub questions shouldn't exceed {config.MAX_SUB_QUESTIONS}."
+            "Your response should be in JSON format with 'next_step' and 'reason' fields."
+        )
     )
 
     result = structured_router.invoke(messages)
@@ -121,7 +166,7 @@ def should_break_query(state: Question):
         next_step_reason if next_step == "create_questions" else None
     )
 
-    # check the number of iterations to prevent infinite loops
+    # Check the number of iterations to prevent infinite loops
     break_iteration = state.get("break_questions_iterations_count", 0)
     if break_iteration >= 3:
         print(
@@ -148,18 +193,18 @@ def should_break_query(state: Question):
 
 def map_search(state: Question):
     """
-    用Send把每一sub question发给search_web节点，进行搜索。
+    Use Send to dispatch each sub-question to the search_web node for searching.
     """
     questions = state.get(
         "questions", [state["query"]]
-    )  # 如果没有分解问题，就直接搜索原始查询
+    )  # If no sub-questions, search the original query directly
     return [Send("search_web", {"query": question}) for question in questions]
 
 
 def answer_directly(state: Question):
     """
-    直接根据原始查询和现有信息生成答案，而不进行进一步搜索。
-    使用LLM根据当前状态中的信息生成一个直接的回答。
+    Generate an answer directly based on the original query and existing information without further search.
+    Uses LLM to generate a direct response based on the information in the current state.
     """
     query = state["query"]
     context = state.get("search_results", [])
@@ -181,8 +226,8 @@ def answer_directly(state: Question):
 
 def summarise(state: Question):
     """
-    对搜索结果进行总结，提取关键信息和洞见。
-    使用LLM对每个搜索结果进行分析，并生成一个综合的总结。
+    Summarize the search results and extract key information and insights.
+    Uses LLM to analyze each search result and generate a comprehensive summary.
     """
 
     prompt = SYNTHESIS_PROMPT.format(
