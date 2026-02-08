@@ -21,10 +21,9 @@ class Search(MessagesState):
     ]  # Source information used to generate search results
 
 
-class Question(MessagesState):
+class WebSearchState(MessagesState):
     query: str  # User's original query
     questions: List[str]  # List of decomposed queries
-    next_step_reason: str | None  # Reason for decomposition
     break_questions_iterations_count: int  # Number of iterations for query decomposition
     human_feedback: str | None  # Human feedback
     search_results: Annotated[List[Dict[str, str]], operator.add]  # Search materials
@@ -32,23 +31,26 @@ class Question(MessagesState):
         List[Source], operator.add
     ]  # Source information used to generate search results
     summary: str  # Summary of search results
+    score: int | None  # Overall score for the summary
+    strengths: str | None  # Overall positive feedback
+    weaknesses: str | None  # Overall negative feedback
+    summarise_iterations: int  # Number of iterations for review and feedback
 
 
-class Paragraph(TypedDict):
-    """State for each paragraph in the report"""
+class Plan(MessagesState):
+    query: str  # User's original query
+    questions: List[str]  # List of decomposed queries
+    break_questions_iterations_count: int  # Number of iterations for query decomposition
+    human_feedback: str | None  # Human feedback
+    score: int | None  # Overall score for the summary
+    strengths: str | None  # Overall positive feedback
+    weaknesses: str | None  # Overall negative feedback
+    summarise_iterations: int  # Number of iterations for review and feedback
 
-    title: str  # Paragraph title
-    content: str  # Paragraph content
-    sources: Annotated[
-        List[Source], operator.add
-    ]  # Source information used to generate this paragraph
 
-
-class AgentState(TypedDict):
-    """State for the entire report"""
-
-    query: str  # Original query
-    report_title: str  # Report title
-    paragraphs: List[Paragraph]
-    final_report: str  # Final report content
-    is_completed: bool  # Whether completed
+class Review(MessagesState):
+    query: str  # User's original query
+    summary: str  # The summary generated from search results
+    score: int | None  # Overall score for the summary
+    strengths: str | None  # Overall positive feedback
+    weaknesses: str | None  # Overall negative feedback

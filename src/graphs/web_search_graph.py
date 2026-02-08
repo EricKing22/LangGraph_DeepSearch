@@ -1,40 +1,35 @@
 from langgraph.graph import StateGraph, START, END
-from state import Question
+from state import WebSearchState
 from nodes.question_nodes import (
-    create_questions,
+    plan,
     summarise,
     should_break_query,
-    extract_query,
+    human_feedback,
+    should_skip_human_feedback,
+    is_finished,
 )
 from nodes.search_nodes import search_web
+from nodes.review_nodes import review
 
 
 # Build the graph
-builder = StateGraph(state_schema=Question)
-
-# Add nodes
-builder.add_node("extract_query", extract_query)
-builder.add_node("create_questions", create_questions)
+builder = StateGraph(state_schema=WebSearchState)
+builder.add_node("plan", plan)
 builder.add_node("search_web", search_web)
 builder.add_node("summarise", summarise)
+builder.add_node("human_feedback", human_feedback)
+builder.add_node("review", review)
 
-# Add edges
-builder.add_edge(START, "extract_query")
-# Start: decide whether to break query or search directly
+builder.add_edge(START, "plan")
 builder.add_conditional_edges(
-    "extract_query", should_break_query, ["search_web", "create_questions"]
+    "plan", should_skip_human_feedback, ["human_feedback", "search_web"]
+)
+builder.add_conditional_edges(
+    "human_feedback", should_break_query, ["plan", "search_web"]
 )
 
-# After creating questions: decide whether to improve questions or proceed to search
-builder.add_conditional_edges(
-    "create_questions", should_break_query, ["create_questions", "search_web"]
-)
-
-# After search: proceed to summarization
 builder.add_edge("search_web", "summarise")
-
-# After summarization: end the workflow
-builder.add_edge("summarise", END)
-
-# Compile the graph - LangGraph Cloud will provide checkpointer
-graph = builder.compile()
+builder.add_edge("summarise", "review")
+builder.add_conditional_edges("review", is_finished, [END, "plan", "summarise"])
+# Compile
+graph = builder.compile(interrupt_before=["human_feedback"])

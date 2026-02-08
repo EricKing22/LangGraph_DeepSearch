@@ -84,3 +84,25 @@ Provide your assessment in **JSON format** with the following keys:
 
 Ensure the output is valid JSON and nothing else.
 """
+
+REVIEW_REPORT_PROMPT = """You are an expert reviewer tasked with evaluating the quality of the following report based on the original query and the sources used.
+
+Original Query:
+{query}
+
+Report:
+{report}
+
+Generate a comprehensive review of the report considering the following criteria:
+1. **Accuracy:** Does the report accurately reflect the information from the sources?
+2. **Completeness:** Does the report cover all relevant aspects of the query?
+3. **Clarity:** Is the report well-structured and easy to understand?
+4. **Source Utilization:** Are the sources appropriately cited and utilized in the report?
+
+
+Provide your review in **JSON format** with the following keys:
+- "score": integer (1-10, where 10 is the best)
+- "strengths": string (briefly describe the strengths of the report)
+- "weaknesses": string (briefly describe the weaknesses of the report)
+Ensure the output is valid JSON and nothing else.
+"""

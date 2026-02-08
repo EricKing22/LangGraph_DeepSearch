@@ -19,7 +19,7 @@ minmax_llm = ChatOpenAI(
     model=config.MINMAX_MODEL,
     temperature=config.MINMAX_TEMPERATURE,
     api_key=config.MINMAX_API_KEY,
-    base_url="https://api.minimax.io/v1",
+    base_url="https://api.minimax.io",
 )
 
 ollama_llm = ChatOllama(
