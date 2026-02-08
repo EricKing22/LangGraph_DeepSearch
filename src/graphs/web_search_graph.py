@@ -1,3 +1,5 @@
+# Import config first to ensure logging is configured
+
 from langgraph.graph import StateGraph, START, END
 from state import WebSearchState
 from nodes.question_nodes import (
@@ -10,6 +12,7 @@ from nodes.question_nodes import (
 )
 from nodes.search_nodes import search_web
 from nodes.review_nodes import review
+from langgraph.checkpoint.memory import MemorySaver
 
 
 # Build the graph
@@ -32,4 +35,5 @@ builder.add_edge("search_web", "summarise")
 builder.add_edge("summarise", "review")
 builder.add_conditional_edges("review", is_finished, [END, "plan", "summarise"])
 # Compile
-graph = builder.compile(interrupt_before=["human_feedback"])
+memory = MemorySaver()
+graph = builder.compile(checkpointer=memory, interrupt_before=["human_feedback"])

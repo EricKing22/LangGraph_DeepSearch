@@ -5,6 +5,9 @@ from llm import ollama_llm as llm
 from langchain.messages import SystemMessage, AIMessage
 from tools.search_tool import search_tavily
 from prompts import RELEVANCE_CHECK_PROMPT
+import logging
+
+logger = logging.getLogger("LangGraph_DeepSearch.search_nodes")
 
 
 def judge_relevance(query: str, search_result: Dict[str, str]) -> bool:
@@ -42,12 +45,12 @@ def judge_relevance(query: str, search_result: Dict[str, str]) -> bool:
 
     try:
         decision = structured_llm.invoke([SystemMessage(content=prompt)])
-        print(
+        logger.debug(
             f"Relevance check for '{title[:50]}...': {decision.is_relevant} - {decision.reason}"
         )
         return decision.is_relevant
     except Exception as e:
-        print(f"Error judging relevance: {str(e)}")
+        logger.debug(f"Error judging relevance: {str(e)}")
         # Conservative handling when error occurs, keep the result
         return True
 
@@ -70,17 +73,17 @@ def search_web(state: Search):
             if judge_relevance(query, result):
                 filtered_results.append(result)
 
-        print(
+        logger.debug(
             f"For query {query}, keeping {len(filtered_results)} out of {len(results)} results\n"
         )
 
         search_results.append({"question": query, "results": filtered_results})
     except Exception as e:
-        print(f"Search Failed '{query}': {str(e)}")
+        logger.debug(f"Search Failed '{query}': {str(e)}")
         search_results.append({"question": query, "results": [], "error": str(e)})
 
     # Track search action with summary of what was searched
-    search_summary = f"Searched for: **{query}** (Found {len(search_results[0].get('results', []))} relevant results)"
+    search_summary = f"Search for: **{query}** (Found {len(search_results[0].get('results', []))} relevant results)"
     return {
         "messages": [AIMessage(content=search_summary)],
         "search_results": search_results,

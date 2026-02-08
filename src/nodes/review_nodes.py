@@ -23,7 +23,7 @@ def review(state: Review):
     structured_llm = llm.with_structured_output(Review)
     try:
         feedback = structured_llm.invoke(prompt)
-        message = f"Review feedback:\n\n **Score**={feedback.score},\n**Strengths**={feedback.strengths},\n**Weaknesses**={feedback.weaknesses}"
+        message = f"Review feedback:\n\n**Score**={feedback.score},\n**Strengths**={feedback.strengths},\n**Weaknesses**={feedback.weaknesses}"
     except Exception as e:
         message = f"Error during review: {str(e)}"
         feedback = Review(score=0, strengths="N/A", weaknesses="Error during review")

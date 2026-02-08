@@ -8,6 +8,9 @@ from langchain.messages import SystemMessage, HumanMessage, AIMessage
 from langgraph.graph import END
 from prompts import BREAK_QUESTIONS_PROMPT, SYNTHESIS_PROMPT
 from src import config
+import logging
+
+logger = logging.getLogger("LangGraph_DeepSearch.question_nodes")
 
 
 def extract_query(state: Plan):
@@ -52,7 +55,7 @@ def plan(state: Plan):
     Generate a list of sub-questions based on user's original query.
     Uses LLM to generate multiple sub-queries for separate search and analysis in subsequent steps.
     """
-    print("Creating sub-questions")
+    logger.debug("Creating sub-questions")
 
     query = extract_query(state)
     questions = state.get("questions", [])
@@ -113,7 +116,7 @@ def plan(state: Plan):
             AIMessage(
                 content="I'm now going to search for these topics:\n"
                 + "\n".join(f"**{i+1}**. **{q}**" for i, q in enumerate(questions))
-                + f"\n\n**Reason for these sub-questions:**\n {reason}"
+                + f"\n\n**Reason for these sub-questions:**\n{reason}"
             )
         ],
     }
@@ -173,7 +176,7 @@ def should_break_query(state: Plan):
 
     human_feedback = state.get("human_feedback", "")
     if human_feedback:
-        print("Considering human feedback ...")
+        logger.debug("Considering human feedback ...")
         messages.append(HumanMessage(content=f"Human Feedback: {human_feedback}"))
 
     messages.append(
@@ -194,14 +197,14 @@ def should_break_query(state: Plan):
     # Check the number of iterations to prevent infinite loops
     break_iteration = state.get("break_questions_iterations_count", 0)
     if break_iteration >= 3:
-        print(
+        logger.debug(
             f"Reached maximum break iterations ({break_iteration}). Forcing next step to 'search_web'."
         )
         next_step = "search_web"
 
     # Log the router decision and reasoning for debugging and transparency
-    print(f"Router decision: {next_step}")
-    print(f"Router reasoning: {next_step_reason}")
+    logger.debug(f"Router decision: {next_step}")
+    logger.debug(f"Router reasoning: {next_step_reason}")
 
     if next_step == "plan":
         return next_step
@@ -219,7 +222,7 @@ def human_feedback(state: Plan):
         if isinstance(message, HumanMessage):
             feedback = message.content
             break
-    print("Feedback Received")
+    logger.debug("Feedback Received")
     return {"human_feedback": feedback}
 
 
@@ -329,7 +332,7 @@ def is_finished(state: WebSearchState):
     next_step = result.next_step
     reason = result.reason
 
-    print(f"Verifier Router decision: {next_step}")
-    print(f"Verifier Router reasoning: {reason}")
+    logger.debug(f"Verifier Router decision: {next_step}")
+    logger.debug(f"Verifier Router reasoning: {reason}")
 
     return next_step

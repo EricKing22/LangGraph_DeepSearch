@@ -2,6 +2,7 @@
 Configuration management module - Load environment variables from .env file
 """
 import os
+import logging
 from dotenv import load_dotenv
 
 # Load .env file
@@ -72,3 +73,13 @@ INFINITY_API_URL = os.getenv("INFINITY_API_URL", "http://localhost:7997")
 
 DEBUG = get_bool("DEBUG", False)
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
+# Configure logging
+logging.basicConfig(
+    level=LOG_LEVEL if DEBUG else "WARNING",
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+# Create a logger for the application
+logger = logging.getLogger("LangGraph_DeepSearch")

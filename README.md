@@ -2,6 +2,8 @@
 
 Reproducing deep search functionality using LangGraph framework.
 
+> **⚠️ Development Status**: This project is currently under active development. More features and improvements will be added over time.
+
 ## 📚 Why LangGraph?
 
 - **Stateful Workflows**: Built-in state management for complex search pipelines
@@ -70,6 +72,72 @@ This command will:
 - Provide hot-reload for code changes
 - Set up automatic checkpointing for conversation state
 
+### Command Line Interface (CLI)
+
+For quick searches without the development server, use the CLI directly:
+
+#### Basic Usage
+
+```bash
+# Simple query
+deepsearch --query "What is the difference between LangSmith and LangGraph?"
+
+# Query with custom thread ID (useful for maintaining separate conversation contexts)
+deepsearch --query "What are the benefits of using LangGraph?" --thread-id "conversation-123"
+
+# Multi-word queries (quotes required)
+deepsearch --query "How does quantum computing differ from classical computing?"
+```
+
+#### CLI Workflow
+
+When you run a query via CLI, the following happens:
+
+1. **Query Processing**: Your query is analyzed and decomposed into sub-questions
+2. **Human Feedback** (Interactive): You'll be prompted to review and provide feedback on the generated sub-questions
+   - Press Enter to proceed with the current questions
+   - Provide feedback to refine the questions
+3. **Web Search**: Each sub-question is searched using Tavily API
+4. **Result Synthesis**: Results are compiled into a comprehensive answer with citations
+5. **Quality Review**: The answer is automatically reviewed and scored
+6. **Final Output**: Displays the complete answer with sources
+
+#### Interactive Feedback Example
+
+```
+🔍 Processing query ...
+✓ Query processed!
+
+🤖 [plan] I'm now going to search for these topics:
+**1**. What is LangSmith and what are its primary features?
+**2**. What is LangGraph and what are its primary features?
+
+💬 Please provide feedback on the sub-questions:
+(Press Enter with no input to proceed as-is)
+
+Your feedback: Add a question about pricing differences
+
+✓ Received feedback: Add a question about pricing differences
+
+[Processing continues with updated questions...]
+```
+
+#### Output Format
+
+The CLI provides structured output with:
+- 🔍 Processing indicator
+- 🤖 Node-level outputs (shows which component is working)
+- 📄 Final summary with detailed analysis
+- 📚 Number of sources consulted
+- Citations in IEEE reference style
+
+#### Tips
+
+- **Use quotes** around your query if it contains multiple words
+- **Thread IDs** allow you to maintain separate conversation contexts for different topics
+- **Feedback is optional** - press Enter (empty message) to skip and proceed with generated sub-questions
+- **Interruption** - Press `Ctrl+C` to cancel a search in progress
+
 ### How It Works
 
 1. **Query Extraction**: Extracts the user's query from messages
@@ -118,20 +186,29 @@ LangGraph_DeepSearch/
 │   ├── graphs/
 │   │   └── web_search_graph.py    # Main graph definition
 │   ├── nodes/
-│   │   ├── question_nodes.py      # Query processing nodes
-│   │   └── search_nodes.py        # Search execution nodes
+│   │   ├── question_nodes.py      # Query processing and planning nodes
+│   │   ├── search_nodes.py        # Web search execution nodes
+│   │   └── review_nodes.py        # Quality review and scoring nodes
 │   ├── state/
-│   │   └── states.py              # State schemas
+│   │   └── states.py              # State schemas (WebSearchState, Search, etc.)
 │   ├── tools/
 │   │   └── search_tool.py         # Tavily search integration
 │   ├── prompts/
-│   │   └── search_prompts.py      # LLM prompts
-│   ├── config.py                  # Configuration management
-│   └── llm.py                     # LLM initialization
+│   │   └── search_prompts.py      # LLM prompts for all nodes
+│   ├── utils/                     # Utility functions
+│   ├── cli.py                     # Command-line interface
+│   ├── config.py                  # Configuration management & logging setup
+│   ├── llm.py                     # LLM initialization
+│   └── __init__.py                # Package initialization
+├── tests/
+│   ├── test_graphs.py             # Graph tests
+│   ├── test_nodes.py              # Node tests
+│   └── test_tools.py              # Tool tests
 ├── langgraph.json                 # LangGraph configuration
-├── .env                           # Environment variables
+├── .env                           # Environment variables (create from .env.example)
 ├── .env.example                   # Environment template
-├── pyproject.toml                 # Project dependencies
+├── pyproject.toml                 # Project dependencies & metadata
+├── requirements.txt               # Python dependencies
+├── LICENSE                        # License file
 └── README.md                      # This file
 ```
-=

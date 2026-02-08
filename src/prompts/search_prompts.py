@@ -41,7 +41,7 @@ Context from web sources:
 5. **Language:** **Always answer in the same language as the user's query.** (e.g., if the query is in Chinese, answer in Chinese, even if the sources are in English).
 
 ### Format
-- **Introduction (summary the question and answer)**
+- **Introduction (summarise the question and answer)**
 - **Detailed Analysis** (with inline citations)
 - **References**
 
