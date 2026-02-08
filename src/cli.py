@@ -8,8 +8,6 @@ src_dir = Path(__file__).parent
 if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
 
-# Import config FIRST to set up logging before anything else
-
 
 def main():
     parser = argparse.ArgumentParser(
