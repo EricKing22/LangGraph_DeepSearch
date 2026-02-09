@@ -55,3 +55,4 @@ htmlcov/
 data/
 temp/
 logs/
+.langgraph_api/
