@@ -1,10 +1,10 @@
 from pydantic import BaseModel, Field
-from state import Search
+from src.state import Search
 from typing import Dict
-from llm import ollama_llm as llm
+from src.llm import question_llm as llm
 from langchain.messages import SystemMessage, AIMessage
-from tools.search_tool import search_tavily
-from prompts import RELEVANCE_CHECK_PROMPT
+from src.tools.search_tool import search_tavily
+from src.prompts import RELEVANCE_CHECK_PROMPT
 import logging
 
 logger = logging.getLogger("LangGraph_DeepSearch.search_nodes")

@@ -1,8 +1,8 @@
 from pydantic import BaseModel, Field
 from langchain.messages import AIMessage
-from prompts import REVIEW_REPORT_PROMPT
-from state import Review
-from llm import ollama_llm as llm
+from src.prompts import REVIEW_REPORT_PROMPT
+from src.state import Review
+from src.llm import question_llm as llm
 
 
 def review(state: Review):

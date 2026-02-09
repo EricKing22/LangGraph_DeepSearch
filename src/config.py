@@ -75,6 +75,9 @@ INFINITY_API_URL = os.getenv("INFINITY_API_URL", "http://localhost:7997")
 DEBUG = get_bool("DEBUG", False)
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
+QUESTION_MODEL = os.getenv("QUESTION_MODEL", "")
+REPORT_MODEL = os.getenv("REPORT_MODEL","")
+
 # Configure logging
 logging.basicConfig(
     level=LOG_LEVEL if DEBUG else "WARNING",
