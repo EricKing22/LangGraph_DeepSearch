@@ -1,11 +1,12 @@
 """
 Tests for graph nodes
 """
+
 import pytest
 from unittest.mock import patch, MagicMock
 from langchain_core.messages import HumanMessage, AIMessage
-from nodes.question_nodes import extract_query, plan, should_skip_human_feedback
-from nodes.review_nodes import review
+from src.nodes.question_nodes import extract_query, plan, should_skip_human_feedback
+from src.nodes.review_nodes import review
 
 
 class TestExtractQuery:
@@ -54,8 +55,8 @@ class TestExtractQuery:
 class TestPlan:
     """Test cases for plan node"""
 
-    @patch("nodes.question_nodes.llm")
-    @patch("nodes.question_nodes.config")
+    @patch("src.nodes.question_nodes.llm")
+    @patch("src.nodes.question_nodes.config")
     def test_plan_generates_subquestions(self, mock_config, mock_llm):
         """Test that plan generates sub-questions"""
         mock_config.MAX_SUB_QUESTIONS = 5
@@ -82,8 +83,8 @@ class TestPlan:
         assert "messages" in result
         assert result["break_questions_iterations_count"] == 1
 
-    @patch("nodes.question_nodes.llm")
-    @patch("nodes.question_nodes.config")
+    @patch("src.nodes.question_nodes.llm")
+    @patch("src.nodes.question_nodes.config")
     def test_plan_with_human_feedback(self, mock_config, mock_llm):
         """Test plan with human feedback"""
         mock_config.MAX_SUB_QUESTIONS = 5
@@ -117,7 +118,7 @@ class TestShouldSkipHumanFeedback:
         result = should_skip_human_feedback(state)
         assert result == "human_feedback"
 
-    @patch("nodes.question_nodes.map_search")
+    @patch("src.nodes.question_nodes.map_search")
     def test_skip_on_subsequent_iterations(self, mock_map_search):
         """Test that human feedback is skipped after first iteration"""
         mock_map_search.return_value = "mocked_result"
@@ -129,7 +130,7 @@ class TestShouldSkipHumanFeedback:
 class TestReview:
     """Test cases for review node"""
 
-    @patch("nodes.review_nodes.llm")
+    @patch("src.nodes.review_nodes.llm")
     def test_review_evaluates_summary(self, mock_llm):
         """Test that review evaluates summary"""
         mock_structured = MagicMock()
@@ -156,7 +157,7 @@ class TestReview:
 class TestIsFinished:
     """Test cases for is_finished router"""
 
-    @patch("nodes.question_nodes.config")
+    @patch("src.nodes.question_nodes.config")
     def test_finished_high_score(self, mock_config):
         """Test that high score leads to END"""
         mock_config.ACCEPTABLE_SCORE = 7
@@ -164,7 +165,7 @@ class TestIsFinished:
 
         state = {"score": 8, "summarise_iterations": 1}
 
-        from nodes.question_nodes import is_finished
+        from src.nodes.question_nodes import is_finished
 
         result = is_finished(state)
 
@@ -172,8 +173,8 @@ class TestIsFinished:
 
         assert result == END
 
-    @patch("nodes.question_nodes.config")
-    @patch("nodes.question_nodes.llm")
+    @patch("src.nodes.question_nodes.config")
+    @patch("src.nodes.question_nodes.llm")
     def test_not_finished_low_score(self, mock_llm, mock_config):
         """Test that low score continues to plan or summarise"""
         mock_config.ACCEPTABLE_SCORE = 7
@@ -188,14 +189,14 @@ class TestIsFinished:
         )
         mock_llm.with_structured_output.return_value = mock_router
 
-        from nodes.question_nodes import is_finished
+        from src.nodes.question_nodes import is_finished
 
         result = is_finished(state)
 
         # Should return plan or summarise, not END
         assert result in ["plan", "summarise"]
 
-    @patch("nodes.question_nodes.config")
+    @patch("src.nodes.question_nodes.config")
     def test_max_iterations_reached(self, mock_config):
         """Test that max iterations leads to END"""
         mock_config.ACCEPTABLE_SCORE = 7
@@ -203,7 +204,7 @@ class TestIsFinished:
 
         state = {"score": 5, "summarise_iterations": 3}
 
-        from nodes.question_nodes import is_finished
+        from src.nodes.question_nodes import is_finished
 
         result = is_finished(state)
 

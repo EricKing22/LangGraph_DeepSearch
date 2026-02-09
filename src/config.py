@@ -1,6 +1,7 @@
 """
 Configuration management module - Load environment variables from .env file
 """
+
 import os
 import logging
 from dotenv import load_dotenv

@@ -1,6 +1,7 @@
 """
 Tavily search tool module
 """
+
 from typing import List, Dict, Any, Literal
 from langchain_tavily import TavilySearch  # updated 1.0
 import config

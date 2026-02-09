@@ -115,7 +115,7 @@ def plan(state: Plan):
         "messages": [
             AIMessage(
                 content="I'm now going to search for these topics:\n"
-                + "\n".join(f"**{i+1}**. **{q}**" for i, q in enumerate(questions))
+                + "\n".join(f"**{i + 1}**. **{q}**" for i, q in enumerate(questions))
                 + f"\n\n**Reason for these sub-questions:**\n{reason}"
             )
         ],
@@ -167,7 +167,7 @@ def should_break_query(state: Plan):
 
     messages = [HumanMessage(content=query)]
     if questions:
-        questions_str = "\n".join(f"{idx+1}. {q}" for idx, q in enumerate(questions))
+        questions_str = "\n".join(f"{idx + 1}. {q}" for idx, q in enumerate(questions))
         messages.append(
             SystemMessage(
                 content=f"These are the previous generated questions:\n{questions_str}"

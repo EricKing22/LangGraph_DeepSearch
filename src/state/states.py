@@ -24,7 +24,9 @@ class Search(MessagesState):
 class WebSearchState(MessagesState):
     query: str  # User's original query
     questions: List[str]  # List of decomposed queries
-    break_questions_iterations_count: int  # Number of iterations for query decomposition
+    break_questions_iterations_count: (
+        int  # Number of iterations for query decomposition
+    )
     human_feedback: str | None  # Human feedback
     search_results: Annotated[List[Dict[str, str]], operator.add]  # Search materials
     sources: Annotated[
@@ -40,7 +42,9 @@ class WebSearchState(MessagesState):
 class Plan(MessagesState):
     query: str  # User's original query
     questions: List[str]  # List of decomposed queries
-    break_questions_iterations_count: int  # Number of iterations for query decomposition
+    break_questions_iterations_count: (
+        int  # Number of iterations for query decomposition
+    )
     human_feedback: str | None  # Human feedback
     score: int | None  # Overall score for the summary
     strengths: str | None  # Overall positive feedback

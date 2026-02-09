@@ -1,6 +1,7 @@
 """
 Tests for graph structure and execution
 """
+
 from unittest.mock import patch, MagicMock
 
 
@@ -9,13 +10,13 @@ class TestWebSearchGraph:
 
     def test_graph_imports(self):
         """Test that graph can be imported"""
-        from graphs.web_search_graph import graph
+        from src.graphs.web_search_graph import graph
 
         assert graph is not None
 
     def test_graph_has_nodes(self):
         """Test that graph contains expected nodes"""
-        from graphs.web_search_graph import builder
+        from src.graphs.web_search_graph import builder
 
         # Check that builder has the expected nodes
         assert builder is not None
@@ -23,7 +24,7 @@ class TestWebSearchGraph:
 
     def test_graph_compilation(self):
         """Test that graph compiles without errors"""
-        from graphs.web_search_graph import graph
+        from src.graphs.web_search_graph import graph
 
         # Graph should be compiled
         assert graph is not None
@@ -31,7 +32,7 @@ class TestWebSearchGraph:
 
     def test_graph_with_checkpointer(self):
         """Test that graph can be compiled with a checkpointer"""
-        from graphs.web_search_graph import builder
+        from src.graphs.web_search_graph import builder
         from langgraph.checkpoint.memory import MemorySaver
 
         # Compile with a checkpointer
@@ -45,10 +46,10 @@ class TestWebSearchGraph:
 class TestGraphExecution:
     """Test cases for graph execution flow"""
 
-    @patch("nodes.question_nodes.llm")
+    @patch("src.nodes.question_nodes.llm")
     def test_graph_basic_execution(self, mock_llm):
         """Test basic graph execution with mocked dependencies"""
-        from graphs.web_search_graph import graph
+        from src.graphs.web_search_graph import graph
 
         # Mock LLM responses
         mock_structured = MagicMock()
@@ -69,7 +70,7 @@ class TestGraphExecution:
 
     def test_graph_state_schema(self):
         """Test that graph uses correct state schema"""
-        from graphs.web_search_graph import builder
+        from src.graphs.web_search_graph import builder
 
         # Verify state schema exists
         assert hasattr(builder, "channels")
@@ -82,14 +83,14 @@ class TestGraphEdges:
 
     def test_graph_has_start_edge(self):
         """Test that graph has edge from START"""
-        from graphs.web_search_graph import builder
+        from src.graphs.web_search_graph import builder
 
         # Builder should have edges configured
         assert builder is not None
 
     def test_graph_has_conditional_edges(self):
         """Test that graph has conditional edges configured"""
-        from graphs.web_search_graph import builder
+        from src.graphs.web_search_graph import builder
 
         # Verify builder has been configured with conditional edges
         # This is implicit in the structure, actual verification depends on internals
@@ -101,16 +102,16 @@ class TestGraphInterrupts:
 
     def test_graph_interrupt_before_human_feedback(self):
         """Test that graph is configured to interrupt before human_feedback"""
-        from graphs.web_search_graph import graph
+        from src.graphs.web_search_graph import graph
 
         # Graph should be compiled with interrupt_before
         assert graph is not None
         # Actual interrupt behavior would need integration test
 
-    @patch("nodes.question_nodes.llm")
+    @patch("src.nodes.question_nodes.llm")
     def test_graph_can_resume_after_interrupt(self, mock_llm):
         """Test that graph can resume after interrupt"""
-        from graphs.web_search_graph import graph
+        from src.graphs.web_search_graph import graph
 
         # Mock LLM
         mock_structured = MagicMock()
@@ -128,7 +129,7 @@ class TestGraphStateManagement:
 
     def test_state_has_required_fields(self):
         """Test that WebSearchState has all required fields"""
-        from state import WebSearchState
+        from src.state.states import WebSearchState
 
         # WebSearchState should have required annotations
         assert hasattr(WebSearchState, "__annotations__")
@@ -142,8 +143,9 @@ class TestGraphStateManagement:
 
     def test_state_message_inheritance(self):
         """Test that WebSearchState has messages field like MessagesState"""
-        from state import WebSearchState
+        from src.state.states import WebSearchState
 
         # Check that WebSearchState has the messages field
-        # TypedDict doesn't support issubclass, so we check annotations
-        assert "messages" in WebSearchState.__annotations__
+        # We just check for the annotation, not isinstance since TypedDict doesn't support that
+        annotations = WebSearchState.__annotations__
+        assert "messages" in annotations
