@@ -76,7 +76,7 @@ DEBUG = get_bool("DEBUG", False)
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 QUESTION_MODEL = os.getenv("QUESTION_MODEL", "")
-REPORT_MODEL = os.getenv("REPORT_MODEL","")
+REPORT_MODEL = os.getenv("REPORT_MODEL", "")
 
 # Configure logging
 logging.basicConfig(

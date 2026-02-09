@@ -1,8 +1,6 @@
 import argparse
 import sys
-from pathlib import Path
 from .graphs.web_search_graph import graph
-
 
 
 def main():
