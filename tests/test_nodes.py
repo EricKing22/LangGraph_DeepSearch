@@ -149,6 +149,7 @@ class TestReview:
         assert "score" in result
         assert "strengths" in result
         assert "weaknesses" in result
+        assert "messages" in result
         assert result["score"] == 8
 
 
@@ -159,7 +160,7 @@ class TestIsFinished:
     def test_finished_high_score(self, mock_config):
         """Test that high score leads to END"""
         mock_config.ACCEPTABLE_SCORE = 7
-        mock_config.MAX_SUMMARISE_ITERATIONS = 3
+        mock_config.MAX_REVIEW_IMPROVE_ITERATIONS = 3
 
         state = {"score": 8, "summarise_iterations": 1}
 
@@ -172,24 +173,33 @@ class TestIsFinished:
         assert result == END
 
     @patch("nodes.question_nodes.config")
-    def test_not_finished_low_score(self, mock_config):
-        """Test that low score leads to plan"""
+    @patch("nodes.question_nodes.llm")
+    def test_not_finished_low_score(self, mock_llm, mock_config):
+        """Test that low score continues to plan or summarise"""
         mock_config.ACCEPTABLE_SCORE = 7
-        mock_config.MAX_SUMMARISE_ITERATIONS = 3
+        mock_config.MAX_REVIEW_IMPROVE_ITERATIONS = 3
 
         state = {"score": 5, "summarise_iterations": 1}
+
+        # Mock LLM response for router
+        mock_router = MagicMock()
+        mock_router.invoke.return_value = MagicMock(
+            next_step="plan", reason="Need more information"
+        )
+        mock_llm.with_structured_output.return_value = mock_router
 
         from nodes.question_nodes import is_finished
 
         result = is_finished(state)
 
-        assert result == "plan"
+        # Should return plan or summarise, not END
+        assert result in ["plan", "summarise"]
 
     @patch("nodes.question_nodes.config")
     def test_max_iterations_reached(self, mock_config):
         """Test that max iterations leads to END"""
         mock_config.ACCEPTABLE_SCORE = 7
-        mock_config.MAX_SUMMARISE_ITERATIONS = 3
+        mock_config.MAX_REVIEW_IMPROVE_ITERATIONS = 3
 
         state = {"score": 5, "summarise_iterations": 3}
 

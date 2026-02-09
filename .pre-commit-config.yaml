@@ -3,7 +3,9 @@ repos:
     rev: v4.5.0
     hooks:
       - id: trailing-whitespace
+        exclude: '\.ipynb$'
       - id: end-of-file-fixer
+        exclude: '\.ipynb$'
       - id: check-yaml
       - id: check-added-large-files
 
@@ -13,7 +15,9 @@ repos:
     hooks:
       - id: ruff
         args: [ --fix ]
+        exclude: '\.ipynb$'
       - id: ruff-format
+        exclude: '\.ipynb$'
 
 
   - repo: https://github.com/pre-commit/mirrors-mypy
@@ -22,3 +26,15 @@ repos:
       - id: mypy
         additional_dependencies: [pydantic, types-requests]
         args: [--ignore-missing-imports]
+        exclude: '\.ipynb$'
+
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: pytest
+        language: system
+        pass_filenames: false
+        always_run: true
+        args: [tests/, -v, --tb=short]

@@ -30,16 +30,16 @@ jobs:
 
     - name: Run Ruff linter
       run: |
-        # Check for linting issues
-        ruff check . --output-format=github
+        # Check for linting issues (exclude notebooks)
+        ruff check . --output-format=github --exclude '*.ipynb'
 
     - name: Run Ruff formatter check
       run: |
-        # Check code formatting
-        ruff format --check .
+        # Check code formatting (exclude notebooks)
+        ruff format --check . --exclude '*.ipynb'
 
     - name: Run mypy type checker
       run: |
-        # Type check the codebase
-        mypy src --ignore-missing-imports
+        # Type check the codebase (exclude notebooks)
+        mypy src --ignore-missing-imports --exclude '\.ipynb$'
       continue-on-error: true  # Don't fail the build on type errors initially

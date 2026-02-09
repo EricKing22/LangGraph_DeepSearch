@@ -30,7 +30,7 @@ def review(state: Review):
 
     return {
         "score": feedback.score,
-        "positive_feedback": feedback.strengths,
-        "negative_feedback": feedback.weaknesses,
+        "strengths": feedback.strengths,
+        "weaknesses": feedback.weaknesses,
         "messages": [AIMessage(content=message)],
     }
