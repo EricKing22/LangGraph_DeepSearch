@@ -35,6 +35,11 @@ if "qwen" in question_model:
         api_key=config.QWEN_API_KEY,
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     )
+else:
+    print(
+        f"Unsupported question model: {question_model}. No LLM will be configured for question nodes."
+    )
+    question_llm = None
 
 report_model = config.REPORT_MODEL.lower()
 if "qwen" in report_model:
@@ -44,5 +49,10 @@ if "qwen" in report_model:
         api_key=config.QWEN_API_KEY,
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     )
+else:
+    print(
+        "Unsupported report model: {report_model}. No LLM will be configured for report nodes."
+    )
+    report_llm = None
 
 __all__ = ["question_llm", "report_llm"]
