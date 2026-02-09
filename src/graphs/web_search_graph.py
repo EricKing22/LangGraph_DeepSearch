@@ -1,8 +1,8 @@
 # Import config first to ensure logging is configured
 
 from langgraph.graph import StateGraph, START, END
-from state import WebSearchState
-from nodes.question_nodes import (
+from src.state import WebSearchState
+from src.nodes.question_nodes import (
     plan,
     summarise,
     should_break_query,
@@ -10,8 +10,8 @@ from nodes.question_nodes import (
     should_skip_human_feedback,
     is_finished,
 )
-from nodes.search_nodes import search_web
-from nodes.review_nodes import review
+from src.nodes.search_nodes import search_web
+from src.nodes.review_nodes import review
 from langgraph.checkpoint.memory import MemorySaver
 
 

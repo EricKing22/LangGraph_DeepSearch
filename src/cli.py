@@ -1,12 +1,6 @@
 import argparse
 import sys
-from pathlib import Path
-from graphs.web_search_graph import graph
-
-# Add src directory to path to support relative imports in graph modules
-src_dir = Path(__file__).parent
-if str(src_dir) not in sys.path:
-    sys.path.insert(0, str(src_dir))
+from .graphs.web_search_graph import graph
 
 
 def main():
