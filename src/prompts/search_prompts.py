@@ -90,6 +90,9 @@ REVIEW_REPORT_PROMPT = """You are an expert reviewer tasked with evaluating the 
 Original Query:
 {query}
 
+Given the sources below, evaluate the quality of the report in terms of how well it answers the original query and utilizes the provided sources.
+{sources}
+
 Report:
 {report}
 

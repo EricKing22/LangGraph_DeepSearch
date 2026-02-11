@@ -4,6 +4,12 @@ Reproducing deep search functionality using LangGraph framework.
 
 > **⚠️ Development Status**: This project is currently under active development. More features and improvements will be added over time.
 
+## 🔄 Graph Architecture
+
+![DeepSearch Graph](assets/DeepSearch_Graph.png)
+
+*The LangGraph workflow showing the complete search pipeline with conditional edges, human-in-the-loop feedback, and iterative refinement.*
+
 ## 📚 Why LangGraph?
 
 - **Stateful Workflows**: Built-in state management for complex search pipelines

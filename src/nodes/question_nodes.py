@@ -292,7 +292,18 @@ def summarise(state: WebSearchState):
     }
 
 
-def is_finished(state: WebSearchState):
+def is_summarise_finished(state: WebSearchState):
+    """
+    Decide whether the review is turned on or the agent has iterated enough times on summarisation.
+    """
+    summarise_iterations = state.get("summarise_iterations", 1)
+    if summarise_iterations >= config.MAX_SUMMARISE_ITERATIONS:
+        return END
+    else:
+        return "review"
+
+
+def is_review_finished(state: WebSearchState):
     """
     Decide whether the agent has gathered enough information to answer the original query.
     Uses LLM to evaluate the current state and determine if it's sufficient to generate a final answer.
@@ -302,9 +313,8 @@ def is_finished(state: WebSearchState):
     score = state.get("score", "5")
     strengths = state.get("strengths", "")
     weaknesses = state.get("weaknesses", "")
-    summarise_iterations = state.get("summarise_iterations", 0)
 
-    if score > 7 or summarise_iterations == config.MAX_REVIEW_IMPROVE_ITERATIONS:
+    if score > 7:
         return END
 
     class Router(BaseModel):
