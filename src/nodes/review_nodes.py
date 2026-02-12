@@ -11,9 +11,22 @@ def review(state: Review):
     This node can be used to capture human feedback on the summary and update the state accordingly for further refinement.
     """
     report = state.get("summary", "")
+
+    sources = ""
+    for source in state.get("sources", []):
+        content = (
+            source.get("title", "")
+            + ":\n"
+            + source.get("url", "")
+            + ":\n"
+            + source.get("content", "")
+        )
+        sources += content + "\n\n"
+
     query = state.get("query", "")
+
     # Generate review report using the prompt
-    prompt = REVIEW_REPORT_PROMPT.format(query=query, report=report)
+    prompt = REVIEW_REPORT_PROMPT.format(query=query, sources=sources, report=report)
 
     class Review(BaseModel):
         score: int = Field(description="Overall score for the summary (1-10)")

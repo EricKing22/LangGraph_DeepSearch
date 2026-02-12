@@ -54,6 +54,9 @@ class Plan(MessagesState):
 
 class Review(MessagesState):
     query: str  # User's original query
+    sources: Annotated[
+        List[Source], operator.add
+    ]  # Source information used to generate search results
     summary: str  # The summary generated from search results
     score: int | None  # Overall score for the summary
     strengths: str | None  # Overall positive feedback

@@ -165,9 +165,9 @@ class TestIsFinished:
 
         state = {"score": 8, "summarise_iterations": 1}
 
-        from src.nodes.question_nodes import is_finished
+        from src.nodes.question_nodes import is_review_finished
 
-        result = is_finished(state)
+        result = is_review_finished(state)
 
         from langgraph.graph import END
 
@@ -189,9 +189,9 @@ class TestIsFinished:
         )
         mock_llm.with_structured_output.return_value = mock_router
 
-        from src.nodes.question_nodes import is_finished
+        from src.nodes.question_nodes import is_review_finished
 
-        result = is_finished(state)
+        result = is_review_finished(state)
 
         # Should return plan or summarise, not END
         assert result in ["plan", "summarise"]
@@ -200,13 +200,13 @@ class TestIsFinished:
     def test_max_iterations_reached(self, mock_config):
         """Test that max iterations leads to END"""
         mock_config.ACCEPTABLE_SCORE = 7
-        mock_config.MAX_REVIEW_IMPROVE_ITERATIONS = 3
+        mock_config.MAX_SUMMARISE_ITERATIONS = 3
 
         state = {"score": 5, "summarise_iterations": 3}
 
-        from src.nodes.question_nodes import is_finished
+        from src.nodes.question_nodes import is_summarise_finished
 
-        result = is_finished(state)
+        result = is_summarise_finished(state)
 
         from langgraph.graph import END
 

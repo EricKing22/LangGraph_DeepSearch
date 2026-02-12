@@ -100,14 +100,6 @@ def main():
             else:
                 print(summary_content)
 
-        # if "questions" in result and result["questions"]:
-        #     print("\n❓ Sub-questions explored:")
-        #     for i, q in enumerate(result["questions"], 1):
-        #         print(f"  {i}. {q}")
-
-        # if "score" in result and result["score"] is not None:
-        #     print(f"\n⭐ Quality Score: {result['score']}/10")
-
         if "sources" in result and result["sources"]:
             print(f"\n📚 Sources consulted: {len(result['sources'])}")
 

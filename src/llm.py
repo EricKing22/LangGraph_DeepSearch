@@ -35,6 +35,11 @@ if "qwen" in question_model:
         api_key=config.QWEN_API_KEY,
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     )
+elif "ollama" in question_model:
+    question_llm = ChatOllama(
+        model="qwen3:8b",
+        temperature=0,
+    )
 else:
     print(
         f"Unsupported question model: {question_model}. No LLM will be configured for question nodes."
@@ -48,6 +53,11 @@ if "qwen" in report_model:
         temperature=config.QWEN_TEMPERATURE,
         api_key=config.QWEN_API_KEY,
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    )
+elif "ollama" in report_model:
+    report_llm = ChatOllama(
+        model="qwen3:8b",
+        temperature=0,
     )
 else:
     print(
