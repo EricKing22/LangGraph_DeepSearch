@@ -3,14 +3,15 @@ from src.state import Search
 from typing import Dict
 from src.llm import question_llm as llm
 from langchain.messages import SystemMessage, AIMessage
-from src.tools.search_tool import search_tavily
+from src.tools.search_tool import search_tavily_impl, search_tavily, get_date
 from src.prompts import RELEVANCE_CHECK_PROMPT
+from langgraph.prebuilt import ToolNode
 import logging
 
 logger = logging.getLogger("LangGraph_DeepSearch.search_nodes")
 
 
-def judge_relevance(query: str, search_result: Dict[str, str]) -> bool:
+async def judge_relevance(query: str, search_result: Dict[str, str]) -> bool:
     """
     Use LLM to judge whether a single search result is relevant to the query
 
@@ -44,7 +45,7 @@ def judge_relevance(query: str, search_result: Dict[str, str]) -> bool:
     )
 
     try:
-        decision = structured_llm.invoke([SystemMessage(content=prompt)])
+        decision = await structured_llm.ainvoke([SystemMessage(content=prompt)])
         logger.debug(
             f"Relevance check for '{title[:50]}...': {decision.is_relevant} - {decision.reason}"
         )
@@ -55,23 +56,77 @@ def judge_relevance(query: str, search_result: Dict[str, str]) -> bool:
         return True
 
 
-def search_web(state: Search):
+async def search_web(state: Search):
     """
-    Execute Tavily search for the query and use LLM to filter irrelevant results
+    Execute Tavily search for the query and use LLM to filter irrelevant results.
+    LLM can decide to use search tools or other tools as needed.
     """
     query = state.get("query")
     search_results = []
 
     try:
-        results = search_tavily(query=query)
+        # Define tools and create ToolNode
+        tools = [search_tavily, get_date]
+        tool_node = ToolNode(tools)
+
+        # Try to use LLM with tools (if supported)
+        results = []
+        try:
+            llm_with_tools = llm.bind_tools(tools)
+
+            # Invoke LLM with tools
+            ai_message = await llm_with_tools.ainvoke(
+                [
+                    SystemMessage(
+                        content=f"Search for information about: {query}\nUse the search_tavily tool to find relevant information."
+                    )
+                ]
+            )
+
+            # Extract results from tool calls using ToolNode
+            if hasattr(ai_message, "tool_calls") and ai_message.tool_calls:
+                # ToolNode automatically executes all tool calls and returns ToolMessages
+                node_result = await tool_node.ainvoke({"messages": [ai_message]})
+
+                # Extract search results from ToolMessages
+                for message in node_result.get("messages", []):
+                    # ToolMessage.content contains the tool's return value
+                    if hasattr(message, "name") and message.name == "search_tavily":
+                        tool_result = message.content
+                        # search_tavily_impl returns a list of dicts
+                        if isinstance(tool_result, list):
+                            results.extend(tool_result)
+                        elif isinstance(tool_result, str):
+                            # If it's a string, it might be an error or serialized result
+                            try:
+                                import json
+
+                                parsed = json.loads(tool_result)
+                                if isinstance(parsed, list):
+                                    results.extend(parsed)
+                                else:
+                                    results.append(parsed)
+                            except (json.JSONDecodeError, TypeError, ValueError):
+                                # If can't parse, treat as single result
+                                results.append({"content": tool_result})
+                        else:
+                            results.append(tool_result)
+        except Exception as tool_error:
+            # If LLM doesn't support tools or bind_tools fails, log and continue to fallback
+            logger.debug(f"Tool calling not supported or failed: {str(tool_error)}")
+
+        # Fallback: if LLM didn't call search tool or tool calling failed, call it directly
+        if not results:
+            logger.debug(f"Using direct search implementation for query: {query}")
+            results = search_tavily_impl(query=query)
 
         # Use judge_relevance to filter results
-
         filtered_results = []
-
         for result in results:
-            if judge_relevance(query, result):
-                filtered_results.append(result)
+            # Ensure result is a dict with expected structure
+            if isinstance(result, dict):
+                if await judge_relevance(query, result):
+                    filtered_results.append(result)
 
         logger.debug(
             f"For query {query}, keeping {len(filtered_results)} out of {len(results)} results\n"
@@ -79,7 +134,7 @@ def search_web(state: Search):
 
         search_results.append({"question": query, "results": filtered_results})
     except Exception as e:
-        logger.debug(f"Search Failed '{query}': {str(e)}")
+        logger.error(f"Search Failed '{query}': {str(e)}")
         search_results.append({"question": query, "results": [], "error": str(e)})
 
     # Track search action with summary of what was searched
@@ -87,5 +142,10 @@ def search_web(state: Search):
     return {
         "messages": [AIMessage(content=search_summary)],
         "search_results": search_results,
-        "sources": [result for result in search_results if "results" in result],
+        "sources": [
+            item
+            for result in search_results
+            if "results" in result
+            for item in result["results"]
+        ],
     }

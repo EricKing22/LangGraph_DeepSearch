@@ -3,5 +3,12 @@
   "graphs": {
     "web_search": "./src/graphs/web_search_graph.py:graph"
   },
-  "env": ".env"
+  "env": ".env",
+  "store": {
+    "index": {
+      "embed": "ollama:bge-m3",
+      "dims": 1024,
+      "fields": ["lesson", "task_query"]
+    }
+  }
 }

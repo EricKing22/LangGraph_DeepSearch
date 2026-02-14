@@ -1,8 +1,8 @@
 """External tool integrations."""
 
-from .search_tool import TavilySearchTool
+from .search_tool import search_tavily
 
 
 __all__ = [
-    "TavilySearchTool",
+    "search_tavily",
 ]

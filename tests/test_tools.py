@@ -2,163 +2,145 @@
 Tests for search tools
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
-from src.tools.search_tool import TavilySearchTool
+from unittest.mock import patch
+from src.tools.search_tool import search_tavily, _extract_results
 
 
-class TestTavilySearchTool:
-    """Test cases for TavilySearchTool"""
+class TestExtractResults:
+    """Test cases for _extract_results function"""
 
-    @patch("src.tools.search_tool.config")
-    def test_initialization_with_api_key(self, mock_config):
-        """Test tool initialization with valid API key"""
-        mock_config.TAVILY_API_KEY = "test_api_key"
-        mock_config.MAX_SEARCH_RESULTS = 5
-
-        with patch("src.tools.search_tool.TavilySearch") as mock_tavily:
-            tool = TavilySearchTool(api_key="test_api_key", max_results=5)
-
-            assert tool.api_key == "test_api_key"
-            assert tool.max_results == 5
-            mock_tavily.assert_called_once_with(max_results=5, api_key="test_api_key")
-
-    @patch("src.tools.search_tool.config")
-    def test_initialization_without_api_key(self, mock_config):
-        """Test that initialization fails without API key"""
-        mock_config.TAVILY_API_KEY = None
-
-        with pytest.raises(ValueError, match="Tavily API key is required"):
-            TavilySearchTool(api_key=None, max_results=5)
-
-    @patch("src.tools.search_tool.config")
-    def test_search_returns_dict_format(self, mock_config):
-        """Test search method with dict response"""
-        mock_config.TAVILY_API_KEY = "test_api_key"
-        mock_config.MAX_SEARCH_RESULTS = 5
-
-        with patch("src.tools.search_tool.TavilySearch") as mock_tavily:
-            mock_client = MagicMock()
-            mock_client.invoke.return_value = {
-                "results": [
-                    {
-                        "title": "Test",
-                        "url": "http://test.com",
-                        "content": "Test content",
-                    }
-                ]
-            }
-            mock_tavily.return_value = mock_client
-
-            tool = TavilySearchTool(api_key="test_api_key", max_results=5)
-            result = tool.search("test query", max_results=3)
-
-            assert "results" in result
-            assert isinstance(result["results"], list)
-            mock_client.invoke.assert_called_once()
-
-    @patch("src.tools.search_tool.config")
-    def test_search_returns_list_format(self, mock_config):
-        """Test search method with list response"""
-        mock_config.TAVILY_API_KEY = "test_api_key"
-        mock_config.MAX_SEARCH_RESULTS = 5
-
-        with patch("src.tools.search_tool.TavilySearch") as mock_tavily:
-            mock_client = MagicMock()
-            mock_client.invoke.return_value = [
-                {"title": "Test", "url": "http://test.com", "content": "Test content"}
+    def test_extract_results_from_dict_response(self):
+        """Test extract_results with dict response containing results"""
+        response = {
+            "results": [
+                {
+                    "title": "Title 1",
+                    "url": "http://test1.com",
+                    "content": "Content 1",
+                },
+                {
+                    "title": "Title 2",
+                    "url": "http://test2.com",
+                    "content": "Content 2",
+                },
             ]
-            mock_tavily.return_value = mock_client
+        }
 
-            tool = TavilySearchTool(api_key="test_api_key", max_results=5)
-            result = tool.search("test query", max_results=3)
+        results = _extract_results(response)
 
-            assert "query" in result
-            assert "results" in result
-            assert result["query"] == "test query"
+        assert len(results) == 2
+        assert results[0]["title"] == "Title 1"
+        assert results[0]["url"] == "http://test1.com"
+        assert results[0]["content"] == "Content 1"
+        assert results[1]["title"] == "Title 2"
+        assert results[1]["url"] == "http://test2.com"
+        assert results[1]["content"] == "Content 2"
 
-    @patch("src.tools.search_tool.config")
-    def test_search_error_handling(self, mock_config):
-        """Test search error handling"""
-        mock_config.TAVILY_API_KEY = "test_api_key"
-        mock_config.MAX_SEARCH_RESULTS = 5
+    def test_extract_results_from_list_response(self):
+        """Test extract_results with list response"""
+        response = [
+            {"title": "Test", "url": "http://test.com", "content": "Test content"}
+        ]
 
-        with patch("src.tools.search_tool.TavilySearch") as mock_tavily:
-            mock_client = MagicMock()
-            mock_client.invoke.side_effect = Exception("API Error")
-            mock_tavily.return_value = mock_client
+        results = _extract_results(response)
 
-            tool = TavilySearchTool(api_key="test_api_key", max_results=5)
+        assert len(results) == 1
+        assert results[0]["title"] == "Test"
+        assert results[0]["url"] == "http://test.com"
+        assert results[0]["content"] == "Test content"
 
-            with pytest.raises(RuntimeError, match="Tavily search failed"):
-                tool.search("test query", max_results=3)
-
-    @patch("src.tools.search_tool.config")
-    def test_extract_results(self, mock_config):
-        """Test extract_results method"""
-        mock_config.TAVILY_API_KEY = "test_api_key"
-        mock_config.MAX_SEARCH_RESULTS = 5
-
-        with patch("src.tools.search_tool.TavilySearch"):
-            tool = TavilySearchTool(api_key="test_api_key", max_results=5)
-
-            response = {
-                "results": [
-                    {
-                        "title": "Title 1",
-                        "url": "http://test1.com",
-                        "content": "Content 1",
-                    },
-                    {
-                        "title": "Title 2",
-                        "url": "http://test2.com",
-                        "content": "Content 2",
-                    },
-                ]
-            }
-
-            results = tool.extract_results(response)
-
-            assert len(results) == 2
-            assert results[0]["title"] == "Title 1"
-            assert results[0]["url"] == "http://test1.com"
-            assert results[0]["content"] == "Content 1"
-
-    @patch("src.tools.search_tool.config")
-    def test_extract_results_empty(self, mock_config):
+    def test_extract_results_empty(self):
         """Test extract_results with empty response"""
-        mock_config.TAVILY_API_KEY = "test_api_key"
-        mock_config.MAX_SEARCH_RESULTS = 5
+        response = {"results": []}
+        results = _extract_results(response)
 
-        with patch("src.tools.search_tool.TavilySearch"):
-            tool = TavilySearchTool(api_key="test_api_key", max_results=5)
+        assert results == []
 
-            response = {"results": []}
-            results = tool.extract_results(response)
-
-            assert results == []
-
-    @patch("src.tools.search_tool.config")
-    def test_extract_results_missing_fields(self, mock_config):
+    def test_extract_results_missing_fields(self):
         """Test extract_results with missing fields in results"""
-        mock_config.TAVILY_API_KEY = "test_api_key"
-        mock_config.MAX_SEARCH_RESULTS = 5
+        response = {
+            "results": [
+                {"title": "Title 1"},  # Missing url and content
+                {"url": "http://test.com"},  # Missing title and content
+            ]
+        }
 
-        with patch("src.tools.search_tool.TavilySearch"):
-            tool = TavilySearchTool(api_key="test_api_key", max_results=5)
+        results = _extract_results(response)
 
-            response = {
-                "results": [
-                    {"title": "Title 1"},  # Missing url and content
-                    {"url": "http://test.com"},  # Missing title and content
-                ]
-            }
+        assert len(results) == 2
+        assert results[0]["title"] == "Title 1"
+        assert results[0]["url"] == ""
+        assert results[0]["content"] == ""
+        assert results[1]["title"] == ""
+        assert results[1]["url"] == "http://test.com"
+        assert results[1]["content"] == ""
 
-            results = tool.extract_results(response)
 
-            assert len(results) == 2
-            assert results[0]["title"] == "Title 1"
-            assert results[0]["url"] == ""
-            assert results[0]["content"] == ""
-            assert results[1]["title"] == ""
-            assert results[1]["url"] == "http://test.com"
+class TestSearchTavily:
+    """Test cases for search_tavily function"""
+
+    @patch("src.tools.search_tool.client")
+    def test_search_returns_list_format(self, mock_client):
+        """Test search_tavily with dict response from client"""
+        mock_client.invoke.return_value = {
+            "results": [
+                {
+                    "title": "Test",
+                    "url": "http://test.com",
+                    "content": "Test content",
+                }
+            ]
+        }
+
+        result = search_tavily.invoke({"query": "test query"})
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["title"] == "Test"
+        mock_client.invoke.assert_called_once()
+
+    @patch("src.tools.search_tool.client")
+    def test_search_handles_list_response(self, mock_client):
+        """Test search_tavily when client returns list"""
+        mock_client.invoke.return_value = [
+            {"title": "Test", "url": "http://test.com", "content": "Test content"}
+        ]
+
+        result = search_tavily.invoke({"query": "test query"})
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+
+    @patch("src.tools.search_tool.client")
+    def test_search_error_handling(self, mock_client):
+        """Test search error handling"""
+        mock_client.invoke.side_effect = Exception("API Error")
+
+        result = search_tavily.invoke({"query": "test query"})
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert "Error performing search" in result[0]["content"]
+
+    @patch("src.tools.search_tool.client")
+    def test_search_with_custom_parameters(self, mock_client):
+        """Test search_tavily with custom parameters"""
+        mock_client.invoke.return_value = {"results": []}
+
+        result = search_tavily.invoke(
+            {"query": "test query", "max_results": 10, "search_depth": "basic"}
+        )
+
+        assert isinstance(result, list)
+        mock_client.invoke.assert_called_once()
+
+    @patch("src.tools.search_tool.client")
+    def test_search_handles_string_response(self, mock_client):
+        """Test search_tavily when client returns unexpected string"""
+        mock_client.invoke.return_value = "Some unexpected string response"
+
+        result = search_tavily.invoke({"query": "test query"})
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert "Some unexpected string response" in result[0]["content"]

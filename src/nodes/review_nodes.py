@@ -5,7 +5,7 @@ from src.state import Review
 from src.llm import question_llm as llm
 
 
-def review(state: Review):
+async def review(state: Review):
     """
     Review the generated summary and provide feedback for improvement.
     This node can be used to capture human feedback on the summary and update the state accordingly for further refinement.
@@ -35,7 +35,7 @@ def review(state: Review):
 
     structured_llm = llm.with_structured_output(Review)
     try:
-        feedback = structured_llm.invoke(prompt)
+        feedback = await structured_llm.ainvoke(prompt)
         message = f"Review feedback:\n\n**Score**={feedback.score},\n**Strengths**={feedback.strengths},\n**Weaknesses**={feedback.weaknesses}"
     except Exception as e:
         message = f"Error during review: {str(e)}"

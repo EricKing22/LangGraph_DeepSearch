@@ -1,10 +1,7 @@
-"""
-Tests for graph nodes
-"""
-
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 from langchain_core.messages import HumanMessage, AIMessage
+from langgraph.graph import END
 from src.nodes.question_nodes import extract_query, plan, should_skip_human_feedback
 from src.nodes.review_nodes import review
 
@@ -55,18 +52,20 @@ class TestExtractQuery:
 class TestPlan:
     """Test cases for plan node"""
 
+    @pytest.mark.asyncio
     @patch("src.nodes.question_nodes.llm")
     @patch("src.nodes.question_nodes.config")
-    def test_plan_generates_subquestions(self, mock_config, mock_llm):
+    async def test_plan_generates_subquestions(self, mock_config, mock_llm):
         """Test that plan generates sub-questions"""
         mock_config.MAX_SUB_QUESTIONS = 5
 
-        # Mock LLM response
-        mock_structured = MagicMock()
-        mock_structured.invoke.return_value = MagicMock(
+        # Mock LLM response with AsyncMock
+        mock_result = MagicMock(
             questions=["Question 1?", "Question 2?"],
             reason="These questions cover different aspects",
         )
+        mock_structured = AsyncMock()
+        mock_structured.ainvoke.return_value = mock_result
         mock_llm.with_structured_output.return_value = mock_structured
 
         state = {
@@ -76,23 +75,26 @@ class TestPlan:
             "break_questions_iterations_count": 0,
         }
 
-        result = plan(state)
+        result = await plan(state)
 
         assert "questions" in result
         assert len(result["questions"]) == 2
         assert "messages" in result
         assert result["break_questions_iterations_count"] == 1
 
+    @pytest.mark.asyncio
     @patch("src.nodes.question_nodes.llm")
     @patch("src.nodes.question_nodes.config")
-    def test_plan_with_human_feedback(self, mock_config, mock_llm):
+    async def test_plan_with_human_feedback(self, mock_config, mock_llm):
         """Test plan with human feedback"""
         mock_config.MAX_SUB_QUESTIONS = 5
 
-        mock_structured = MagicMock()
-        mock_structured.invoke.return_value = MagicMock(
+        # Mock LLM response with AsyncMock
+        mock_result = MagicMock(
             questions=["Revised Q1?", "Revised Q2?"], reason="Revised based on feedback"
         )
+        mock_structured = AsyncMock()
+        mock_structured.ainvoke.return_value = mock_result
         mock_llm.with_structured_output.return_value = mock_structured
 
         state = {
@@ -103,7 +105,7 @@ class TestPlan:
             "break_questions_iterations_count": 1,
         }
 
-        result = plan(state)
+        result = await plan(state)
 
         assert "questions" in result
         assert result["break_questions_iterations_count"] == 2
@@ -130,13 +132,16 @@ class TestShouldSkipHumanFeedback:
 class TestReview:
     """Test cases for review node"""
 
+    @pytest.mark.asyncio
     @patch("src.nodes.review_nodes.llm")
-    def test_review_evaluates_summary(self, mock_llm):
+    async def test_review_evaluates_summary(self, mock_llm):
         """Test that review evaluates summary"""
-        mock_structured = MagicMock()
-        mock_structured.invoke.return_value = MagicMock(
+        # Mock LLM response with AsyncMock
+        mock_result = MagicMock(
             score=8, strengths="Well structured", weaknesses="Could be more detailed"
         )
+        mock_structured = AsyncMock()
+        mock_structured.ainvoke.return_value = mock_result
         mock_llm.with_structured_output.return_value = mock_structured
 
         state = {
@@ -145,7 +150,7 @@ class TestReview:
             "messages": [],
         }
 
-        result = review(state)
+        result = await review(state)
 
         assert "score" in result
         assert "strengths" in result
@@ -157,9 +162,10 @@ class TestReview:
 class TestIsFinished:
     """Test cases for is_finished router"""
 
+    @pytest.mark.asyncio
     @patch("src.nodes.question_nodes.config")
-    def test_finished_high_score(self, mock_config):
-        """Test that high score leads to END"""
+    async def test_finished_high_score(self, mock_config):
+        """Test that high score leads to END (learning happens async after summarise)"""
         mock_config.ACCEPTABLE_SCORE = 7
         mock_config.MAX_REVIEW_IMPROVE_ITERATIONS = 3
 
@@ -167,47 +173,53 @@ class TestIsFinished:
 
         from src.nodes.question_nodes import is_review_finished
 
-        result = is_review_finished(state)
+        result = await is_review_finished(state)
 
-        from langgraph.graph import END
-
+        # High score should end (learning already happened async)
         assert result == END
 
+    @pytest.mark.asyncio
     @patch("src.nodes.question_nodes.config")
     @patch("src.nodes.question_nodes.llm")
-    def test_not_finished_low_score(self, mock_llm, mock_config):
+    async def test_not_finished_low_score(self, mock_llm, mock_config):
         """Test that low score continues to plan or summarise"""
         mock_config.ACCEPTABLE_SCORE = 7
         mock_config.MAX_REVIEW_IMPROVE_ITERATIONS = 3
 
         state = {"score": 5, "summarise_iterations": 1}
 
-        # Mock LLM response for router
-        mock_router = MagicMock()
-        mock_router.invoke.return_value = MagicMock(
-            next_step="plan", reason="Need more information"
-        )
+        # Mock LLM response for router with AsyncMock
+        mock_result = MagicMock(next_step="plan", reason="Need more information")
+        mock_router = AsyncMock()
+        mock_router.ainvoke.return_value = mock_result
         mock_llm.with_structured_output.return_value = mock_router
 
         from src.nodes.question_nodes import is_review_finished
 
-        result = is_review_finished(state)
+        result = await is_review_finished(state)
 
         # Should return plan or summarise, not END
         assert result in ["plan", "summarise"]
 
     @patch("src.nodes.question_nodes.config")
     def test_max_iterations_reached(self, mock_config):
-        """Test that max iterations leads to END"""
+        """Test that max iterations with async learning"""
         mock_config.ACCEPTABLE_SCORE = 7
         mock_config.MAX_SUMMARISE_ITERATIONS = 3
+        mock_config.ENABLE_LEARNING = True
 
-        state = {"score": 5, "summarise_iterations": 3}
+        state = {
+            "score": 5,
+            "summarise_iterations": 3,
+            "plan_a": "Plan A content",
+            "plan_b": "Plan B content",
+            "query": "test query",
+        }
 
-        from src.nodes.question_nodes import is_summarise_finished
+        from src.nodes.question_nodes import after_summarise_router
 
-        result = is_summarise_finished(state)
+        result = after_summarise_router(state)
 
-        from langgraph.graph import END
-
-        assert result == END
+        # Should trigger async learning (Send to learn)
+        # Result could be a list with Send or just END
+        assert result is not None

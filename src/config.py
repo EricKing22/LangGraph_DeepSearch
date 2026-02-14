@@ -67,6 +67,9 @@ SCRAPE_TIMEOUT = get_int("SCRAPE_TIMEOUT", 30)
 # Review and Improve
 MAX_SUMMARISE_ITERATIONS = get_int("MAX_SUMMARISE_ITERATIONS", 1)
 
+# Learning
+ENABLE_LEARNING = get_bool("ENABLE_LEARNING", True)
+
 
 RERANKER_MODEL = os.getenv("RERANKER_MODEL", "jina")
 JINA_API_KEY = os.getenv("JINA_API_KEY", "")
