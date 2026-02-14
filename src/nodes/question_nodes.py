@@ -136,7 +136,7 @@ async def plan(state: Plan):
     # Only capture plan_a if it's the first time (plan_a is empty)
     if not plan_a:
         plan_content = ""
-        plan_content += "\n".join(f"{i+1}. {q}" for i, q in enumerate(questions))
+        plan_content += "\n".join(f"{i + 1}. {q}" for i, q in enumerate(questions))
 
         result_dict["plan_a"] = plan_content
 
@@ -252,7 +252,7 @@ def human_feedback(state: Plan):
     if feedback:
         plan_content += f"### Human Feedback:\n{feedback}\n\n"
 
-    plan_content += "\n".join(f"{i+1}. {q}" for i, q in enumerate(questions))
+    plan_content += "\n".join(f"{i + 1}. {q}" for i, q in enumerate(questions))
 
     return {"human_feedback": feedback, "plan_b": plan_content}
 
