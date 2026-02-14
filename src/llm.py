@@ -39,6 +39,7 @@ elif "ollama" in question_model:
     question_llm = ChatOllama(
         model="qwen3:8b",
         temperature=0,
+        async_client=True,
     )
 else:
     print(

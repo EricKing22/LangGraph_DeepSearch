@@ -11,6 +11,28 @@ class Source(TypedDict):
     content: str  # Source content summary or full text
 
 
+class LearningState(TypedDict):
+    """
+    Generic state for learning subgraph - can be reused across different graphs.
+    Only contains the minimal fields needed for learning.
+    """
+
+    query: str  # The task/query being learned from
+    plan_a: str  # Initial plan (before human modification)
+    plan_b: str  # Final plan (after human modification)
+    human_feedback: str | None  # Human's feedback on the plan
+    lesson_learned: str | None  # Extracted lesson from comparison
+
+
+class RecallState(MessagesState):
+    """
+    Generic state for recall functionality - can be reused across different graphs.
+    """
+
+    query: str  # The task/query to search memory for
+    recalled_notes: List[str]  # Notes retrieved from memory store
+
+
 class Search(MessagesState):
     query: str  # Search query
     search_results: Annotated[
@@ -38,6 +60,12 @@ class WebSearchState(MessagesState):
     weaknesses: str | None  # Overall negative feedback
     summarise_iterations: int  # Number of iterations for review and feedback
 
+    # Closed-loop Learning System fields
+    recalled_notes: List[str]  # Notes retrieved from memory store
+    plan_a: str  # Agent's initial plan before human feedback
+    plan_b: str  # Human-modified plan (final plan used for execution)
+    lesson_learned: str | None  # Distilled lesson from plan comparison
+
 
 class Plan(MessagesState):
     query: str  # User's original query
@@ -50,6 +78,11 @@ class Plan(MessagesState):
     strengths: str | None  # Overall positive feedback
     weaknesses: str | None  # Overall negative feedback
     summarise_iterations: int  # Number of iterations for review and feedback
+
+    # Closed-loop Learning System fields
+    recalled_notes: List[str]  # Notes retrieved from memory store
+    plan_a: str  # Agent's initial plan before human feedback
+    plan_b: str  # Human-modified plan (final plan used for execution)
 
 
 class Review(MessagesState):

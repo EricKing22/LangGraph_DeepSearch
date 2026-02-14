@@ -5,9 +5,14 @@ from .search_prompts import (
     REVIEW_REPORT_PROMPT,
 )
 
+from .learning_prompts import (
+    WRITE_NOTES_PROMPT,
+)
+
 __all__ = [
     "BREAK_QUESTIONS_PROMPT",
     "SYNTHESIS_PROMPT",
     "RELEVANCE_CHECK_PROMPT",
     "REVIEW_REPORT_PROMPT",
+    "WRITE_NOTES_PROMPT",
 ]

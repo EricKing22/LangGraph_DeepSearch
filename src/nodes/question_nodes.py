@@ -4,8 +4,8 @@ from typing import List, Literal
 from src.llm import question_llm as llm
 from src.llm import report_llm as summarize_llm
 from langgraph.types import Send
-from langchain.messages import SystemMessage, HumanMessage, AIMessage
 from langgraph.graph import END
+from langchain.messages import SystemMessage, HumanMessage, AIMessage
 from src.prompts import BREAK_QUESTIONS_PROMPT, SYNTHESIS_PROMPT
 from src import config
 import logging
@@ -50,10 +50,11 @@ def extract_query(state: Plan):
     raise ValueError("No query found in state")
 
 
-def plan(state: Plan):
+async def plan(state: Plan):
     """
     Generate a list of sub-questions based on user's original query.
     Uses LLM to generate multiple sub-queries for separate search and analysis in subsequent steps.
+    Incorporates recalled notes from the memory store if available.
     """
     logger.debug("Creating sub-questions")
 
@@ -61,6 +62,7 @@ def plan(state: Plan):
     questions = state.get("questions", [])
     human_feedback = state.get("human_feedback", "")
     score = state.get("score", None)
+    recalled_notes = state.get("recalled_notes", [])
 
     class Sub_Questions(BaseModel):
         questions: List[str] = Field(
@@ -78,6 +80,15 @@ def plan(state: Plan):
             + f"\nRemember the max number of sub questions shouldn't exceed {config.MAX_SUB_QUESTIONS}."
         )
     ]
+
+    # Incorporate recalled notes from memory (Closed-loop Learning)
+    if recalled_notes:
+        notes_str = "\n".join(f"- {note}" for note in recalled_notes)
+        messages.append(
+            SystemMessage(
+                content=f"[IMPORTANT] Below are the notes retrieved from past failures, please consider in later planning:\n{notes_str}"
+            )
+        )
 
     if questions:
         messages.append(SystemMessage(content=f"Current sub questions: {questions}"))
@@ -100,12 +111,13 @@ def plan(state: Plan):
             )
         )
 
-    results = structured_llm.invoke(messages)
+    results = await structured_llm.ainvoke(messages)
     questions = results.questions
     reason = results.reason
 
-    # Update state
-    return {
+    # Capture Plan A on first invocation (inline plan capture)
+    plan_a = state.get("plan_a", "")
+    result_dict = {
         "query": query,
         "break_questions_iterations_count": state.get(
             "break_questions_iterations_count", 0
@@ -121,6 +133,15 @@ def plan(state: Plan):
         ],
     }
 
+    # Only capture plan_a if it's the first time (plan_a is empty)
+    if not plan_a:
+        plan_content = ""
+        plan_content += "\n".join(f"{i+1}. {q}" for i, q in enumerate(questions))
+
+        result_dict["plan_a"] = plan_content
+
+    return result_dict
+
 
 def should_skip_human_feedback(state: Plan):
     """
@@ -133,7 +154,7 @@ def should_skip_human_feedback(state: Plan):
         return "human_feedback"
 
 
-def should_break_query(state: Plan):
+async def should_break_query(state: Plan):
     """
     Decide the next step based on human feedback.
     """
@@ -190,7 +211,7 @@ def should_break_query(state: Plan):
         )
     )
 
-    result = structured_router.invoke(messages)
+    result = await structured_router.ainvoke(messages)
     next_step = result.next_step
     next_step_reason = result.reason
 
@@ -216,6 +237,7 @@ def human_feedback(state: Plan):
     """
     Collect human feedback on the generated sub-questions to improve them iteratively.
     This node can be used to capture human feedback and update the state accordingly for the next iteration of question planning.
+    Also captures Plan B (inline plan capture).
     """
     feedback = ""
     for message in reversed(state.get("messages", [])):
@@ -223,7 +245,16 @@ def human_feedback(state: Plan):
             feedback = message.content
             break
     logger.debug("Feedback Received")
-    return {"human_feedback": feedback}
+
+    # Capture Plan B (human-modified plan)
+    questions = state.get("questions", [])
+    plan_content = ""
+    if feedback:
+        plan_content += f"### Human Feedback:\n{feedback}\n\n"
+
+    plan_content += "\n".join(f"{i+1}. {q}" for i, q in enumerate(questions))
+
+    return {"human_feedback": feedback, "plan_b": plan_content}
 
 
 def map_search(state: Plan):
@@ -236,7 +267,7 @@ def map_search(state: Plan):
     return [Send("search_web", {"query": question}) for question in questions]
 
 
-def answer_directly(state: Plan):
+async def answer_directly(state: Plan):
     """
     Generate an answer directly based on the original query and existing information without further search.
     Uses LLM to generate a direct response based on the information in the current state.
@@ -247,7 +278,7 @@ def answer_directly(state: Plan):
 
     messages = [SystemMessage(content=prompt)]
 
-    answer = llm.invoke(messages)
+    answer = await llm.ainvoke(messages)
 
     # Track the direct answer with both user query and AI response
     return {
@@ -259,10 +290,12 @@ def answer_directly(state: Plan):
     }
 
 
-def summarise(state: WebSearchState):
+async def summarise(state: WebSearchState):
     """
     Summarize the search results and extract key information and insights.
     Uses LLM to analyze each search result and generate a comprehensive summary.
+
+    After summarization, asynchronously triggers learning if enabled.
     """
 
     prompt = SYNTHESIS_PROMPT.format(
@@ -282,7 +315,7 @@ def summarise(state: WebSearchState):
 
     messages = [SystemMessage(content=prompt)]
 
-    summary = summarize_llm.invoke(messages)
+    summary = await summarize_llm.ainvoke(messages)
 
     # Track the summarization with the actual summary content
     return {
@@ -292,21 +325,56 @@ def summarise(state: WebSearchState):
     }
 
 
-def is_summarise_finished(state: WebSearchState):
+def after_summarise_router(state: WebSearchState):
     """
-    Decide whether the review is turned on or the agent has iterated enough times on summarisation.
+    After summarise completes, decide next steps:
+    1. Always check if should continue to review
+    2. If learning enabled and plans exist, Send to learn subgraph asynchronously
+
+    Returns a list that may contain:
+    - Send("learn", {...}) for async learning
+    - "review" or other next steps
     """
+    from src import config
+
     summarise_iterations = state.get("summarise_iterations", 1)
+    plan_a = state.get("plan_a", "")
+    plan_b = state.get("plan_b", "")
+
+    results = []
+
+    # Async learning: Send to learn subgraph if enabled and plans exist
+    if config.ENABLE_LEARNING and plan_a and plan_b:
+        logger.debug("Triggering async learning after summarise")
+        # Send relevant state to learn subgraph
+        results.append(
+            Send(
+                "learn",
+                {
+                    "query": state.get("query", ""),
+                    "plan_a": plan_a,
+                    "plan_b": plan_b,
+                    "human_feedback": state.get("human_feedback", ""),
+                },
+            )
+        )
+
+    # Determine main flow continuation
     if summarise_iterations >= config.MAX_SUMMARISE_ITERATIONS:
-        return END
+        # Max iterations reached, stop here (learning happens async)
+        return results if results else END
     else:
-        return "review"
+        # Continue to review
+        results.append("review")
+        return results if len(results) > 1 else "review"
 
 
-def is_review_finished(state: WebSearchState):
+async def is_review_finished(state: WebSearchState):
     """
     Decide whether the agent has gathered enough information to answer the original query.
     Uses LLM to evaluate the current state and determine if it's sufficient to generate a final answer.
+
+    Note: Learning happens asynchronously after summarise, not here.
     """
     # This is a placeholder implementation. You can design your own logic or LLM prompt to make this decision.
     query = state.get("query", "")
@@ -315,6 +383,7 @@ def is_review_finished(state: WebSearchState):
     weaknesses = state.get("weaknesses", "")
 
     if score > 7:
+        # Good score, we're done (learning already happened async)
         return END
 
     class Router(BaseModel):
@@ -338,7 +407,7 @@ def is_review_finished(state: WebSearchState):
         f"If you think the report is missing critical information to answer the query, return 'plan' in next_step"
     )
     structured_router = llm.with_structured_output(Router)
-    result = structured_router.invoke([SystemMessage(content=prompt)])
+    result = await structured_router.ainvoke([SystemMessage(content=prompt)])
     next_step = result.next_step
     reason = result.reason
 

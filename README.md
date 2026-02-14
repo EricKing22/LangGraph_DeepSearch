@@ -1,6 +1,6 @@
 # LangGraph DeepSearch
 
-Reproducing deep search functionality using LangGraph framework.
+Reproducing deep search functionality using LangGraph framework with **Closed-loop Learning System**.
 
 > **⚠️ Development Status**: This project is currently under active development. More features and improvements will be added over time.
 
@@ -9,6 +9,29 @@ Reproducing deep search functionality using LangGraph framework.
 ![DeepSearch Graph](assets/DeepSearch_Graph.png)
 
 *The LangGraph workflow showing the complete search pipeline with conditional edges, human-in-the-loop feedback, and iterative refinement.*
+
+## 🧠 Closed-loop Learning System
+
+This project implements a **Closed-loop Learning System** that enables the agent to learn from human feedback and improve over time. The system follows three phases:
+
+### Phase 1: Recall & Plan
+1. **Input**: User submits a task/query
+2. **Store Search**: Agent searches LangGraph Store for relevant past experiences
+3. **Draft Plan**: Agent generates initial sub-questions (Plan A) incorporating recalled lessons
+
+### Phase 2: Human-in-the-loop
+4. **Interrupt**: Workflow pauses to show Plan A to human
+5. **Human Correction**: Human reviews and optionally modifies the plan (Plan B)
+6. **Execute**: Agent executes the search with the final plan
+
+### Phase 3: Reflect & Memorize
+7. **Compare**: After task completion, compare Plan A and Plan B
+8. **Distill**: LLM analyzes differences and extracts actionable lessons
+9. **Store**: Save new lessons to LangGraph Store for future use
+
+**Key Benefit**: Over time, as the agent accumulates lessons, it will generate better initial plans that require less human correction!
+
+**Technical Note**: Learning uses **LangGraph Store** (not Checkpointer) for persistent, cross-session memory. Store saves lessons globally with vector embeddings for semantic search, while Checkpointer only saves per-thread conversation state. The learn subgraph runs asynchronously after task completion to avoid blocking the main workflow.
 
 ## 📚 Why LangGraph?
 
@@ -194,11 +217,13 @@ LangGraph_DeepSearch/
 │   ├── nodes/
 │   │   ├── question_nodes.py      # Query processing and planning nodes
 │   │   ├── search_nodes.py        # Web search execution nodes
-│   │   └── review_nodes.py        # Quality review and scoring nodes
+│   │   ├── review_nodes.py        # Quality review and scoring nodes
+│   │   └── learning_nodes.py      # Closed-loop learning nodes (recall, compare, learn)
 │   ├── state/
 │   │   └── states.py              # State schemas (WebSearchState, Search, etc.)
 │   ├── tools/
-│   │   └── search_tool.py         # Tavily search integration
+│   │   ├── search_tool.py         # Tavily search integration
+│   │   └── consult_note.py        # LangGraph Store integration for lessons
 │   ├── prompts/
 │   │   └── search_prompts.py      # LLM prompts for all nodes
 │   ├── utils/                     # Utility functions
@@ -210,7 +235,7 @@ LangGraph_DeepSearch/
 │   ├── test_graphs.py             # Graph tests
 │   ├── test_nodes.py              # Node tests
 │   └── test_tools.py              # Tool tests
-├── langgraph.json                 # LangGraph configuration
+├── langgraph.json                 # LangGraph configuration (includes Store config)
 ├── .env                           # Environment variables (create from .env.example)
 ├── .env.example                   # Environment template
 ├── pyproject.toml                 # Project dependencies & metadata
