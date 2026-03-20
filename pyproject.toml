@@ -52,6 +52,9 @@ Homepage = "https://github.com/EricKing22/LangGraph_DeepSearch"
 Documentation = "https://github.com/EricKing22/LangGraph_DeepSearch#readme"
 Repository = "https://github.com/EricKing22/LangGraph_DeepSearch.git"
 
+[tool.ruff]
+exclude = ["**/*.ipynb"]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
