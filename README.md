@@ -43,8 +43,9 @@ Search across multiple platforms in a single query:
 | **Web** (Tavily) | `--sources web` | General web, news, documentation |
 | **HuggingFace** | `--sources hf` | ML models, datasets, spaces, papers |
 | **arXiv** | `--sources arxiv` | Academic research papers |
+| **GitHub** | `--sources github` | Repositories, issues, code (token needed for code) |
 
-Combine platforms freely: `--sources web hf arxiv`
+Combine platforms freely: `--sources web hf arxiv github`
 
 ---
 
@@ -113,6 +114,10 @@ HUGGINGFACE_SEARCH_ENABLED=false
 
 # arXiv search (optional, no API key required)
 ARXIV_SEARCH_ENABLED=false
+
+# GitHub search (optional)
+GITHUB_SEARCH_ENABLED=false
+# GITHUB_TOKEN=ghp_...  # recommended: raises rate limit and enables code search
 ```
 
 ---
@@ -327,32 +332,111 @@ deepsearch --query "State space models vs Transformers" \
 
 ---
 
+### 🐙 GitHub Research
+
+Find open-source projects, code implementations, and developer discussions.
+
+> **Rate limits**: Without a token — 10 search requests/minute (repos + issues only).
+> Set `GITHUB_TOKEN` in `.env` to get 30 req/min and unlock code search.
+
+```bash
+# Find open-source implementations of a concept
+deepsearch --query "LangGraph multi-agent orchestration" \
+           --sources github
+
+# GitHub + web for broader coverage
+deepsearch --query "vector database comparison Pinecone Weaviate Chroma" \
+           --sources web github
+
+# GitHub + arXiv: find both papers and implementations
+deepsearch --query "graph neural networks node classification" \
+           --sources github arxiv
+
+# Search repositories AND code (requires GITHUB_TOKEN)
+# Set GITHUB_SEARCH_TYPES=repos,issues,code in .env first
+deepsearch --query "flash attention CUDA implementation" \
+           --sources github \
+           --no-feedback
+```
+
+**Example output (GitHub sources):**
+
+```
+🔍 Processing query ... [GITHUB]
+
+🤖 [plan] I'm now going to search for these topics:
+**1**. LangGraph multi-agent orchestration repositories and examples
+**2**. Open issues and discussions around LangGraph agent coordination
+**3**. Existing frameworks built on top of LangGraph
+
+[After search...]
+
+📄 Summary:
+## LangGraph Multi-Agent Orchestration
+
+### Top Repositories
+- **[GitHub Repo] langchain-ai/langgraph** ⭐ 12,400
+  The official LangGraph repository — build stateful, multi-actor applications with LLMs...
+
+- **[GitHub Repo] Onelevenvy/flock** ⭐ 2,100
+  Workflow-based low-code platform for multi-agent teams powered by LangGraph...
+
+### Relevant Issues & Discussions
+- **[GitHub Issue] Multi-agent communication patterns in LangGraph**
+  Open · 14 comments · Labels: enhancement, agents
+
+...
+
+⭐ Review Score: 8/10  [████████░░]
+📚 Sources consulted: 9 (9 GitHub)
+```
+
+**Continue a GitHub research session:**
+
+```bash
+# Start exploring a topic
+deepsearch --query "LLM inference optimization techniques" \
+           --sources web github \
+           --thread-id llm-inference
+
+# Follow up on a specific finding
+deepsearch --query "PagedAttention vLLM implementation details" \
+           --sources github arxiv \
+           --continue llm-inference
+```
+
+---
+
 ### 🔀 Combined Multi-Platform Research
 
 Use all sources together for the most comprehensive results.
 
 ```bash
-# Full research: web news + HuggingFace models + arXiv papers
+# Full research: web + HuggingFace models + arXiv papers + GitHub repos
 deepsearch --query "Retrieval-Augmented Generation best practices" \
-           --sources web hf arxiv
+           --sources web hf arxiv github
 
 # Academic + implementations (great for replicating papers)
 deepsearch --query "LoRA fine-tuning for vision models" \
-           --sources hf arxiv \
+           --sources hf arxiv github \
            --max-questions 5 \
            --verbose
 
-# Quick scan with no human review
-deepsearch --query "Flash Attention optimizations" \
-           --sources web arxiv \
-           --no-feedback \
-           --max-questions 3
+# Find papers AND open-source code for a technique
+deepsearch --query "speculative decoding LLM inference" \
+           --sources web arxiv github \
+           --no-feedback
+
+# Everything: latest news + models + papers + code
+deepsearch --query "multimodal large language models 2024" \
+           --sources web hf arxiv github \
+           --max-questions 4
 ```
 
 **Source breakdown in output:**
 
 ```
-📚 Sources consulted: 18 (6 web, 7 HuggingFace, 5 arXiv)
+📚 Sources consulted: 22 (5 web, 6 HuggingFace, 6 arXiv, 5 GitHub)
 ```
 
 ---
@@ -370,7 +454,7 @@ Core:
   --thread-id ID            Custom thread ID (auto-generated if omitted)
 
 Search Control:
-  --sources SOURCE ...      Backends: web | hf | arxiv  (default: env config)
+  --sources SOURCE ...      Backends: web | hf | arxiv | github  (default: env config)
   --max-questions N         Override max sub-questions for this run
   --no-feedback             Auto-approve generated sub-questions
 
@@ -422,6 +506,7 @@ LangGraph_DeepSearch/
 │   │   ├── search_tool.py         # Tavily web search
 │   │   ├── huggingface_tool.py    # HuggingFace Hub search
 │   │   ├── arxiv_tool.py          # arXiv paper search
+│   │   ├── github_tool.py         # GitHub repos, issues, and code search
 │   │   └── consult_note.py        # LangGraph Store (lessons memory)
 │   ├── prompts/
 │   │   └── search_prompts.py      # LLM prompts for all nodes
@@ -445,7 +530,9 @@ LangGraph_DeepSearch/
 | Problem | Fix |
 |---|---|
 | `command not found: deepsearch` | Run `pip install -e .` in the project root |
-| `TAVILY_API_KEY not set` | Add key to `.env` or use `--sources hf arxiv` to skip web |
+| `TAVILY_API_KEY not set` | Add key to `.env` or skip web with `--sources hf arxiv github` |
 | `huggingface_hub not found` | Run `pip install huggingface_hub` |
+| GitHub rate limit (429) | Set `GITHUB_TOKEN` in `.env` to raise limit to 30 req/min |
+| GitHub code search empty | Code search requires `GITHUB_TOKEN` to be set |
 | Port 2024 in use | `langgraph dev --port 8080` |
 | Low review scores | Provide feedback at the sub-question prompt to guide the search |
