@@ -59,7 +59,15 @@ class TestPlan:
         """Test that plan generates sub-questions"""
         mock_config.MAX_SUB_QUESTIONS = 5
 
-        # Mock LLM response with AsyncMock
+        # Mock bind_tools chain: return an AsyncMock whose ainvoke yields a
+        # response with no tool_calls so the progressive-disclosure loop exits.
+        mock_tool_response = MagicMock()
+        mock_tool_response.tool_calls = []
+        mock_llm_with_tools = AsyncMock()
+        mock_llm_with_tools.ainvoke.return_value = mock_tool_response
+        mock_llm.bind_tools.return_value = mock_llm_with_tools
+
+        # Mock structured output for sub-question generation
         mock_result = MagicMock(
             questions=["Question 1?", "Question 2?"],
             reason="These questions cover different aspects",
@@ -89,7 +97,14 @@ class TestPlan:
         """Test plan with human feedback"""
         mock_config.MAX_SUB_QUESTIONS = 5
 
-        # Mock LLM response with AsyncMock
+        # Mock bind_tools chain: no tool calls so loop exits immediately
+        mock_tool_response = MagicMock()
+        mock_tool_response.tool_calls = []
+        mock_llm_with_tools = AsyncMock()
+        mock_llm_with_tools.ainvoke.return_value = mock_tool_response
+        mock_llm.bind_tools.return_value = mock_llm_with_tools
+
+        # Mock structured output for sub-question generation
         mock_result = MagicMock(
             questions=["Revised Q1?", "Revised Q2?"], reason="Revised based on feedback"
         )
