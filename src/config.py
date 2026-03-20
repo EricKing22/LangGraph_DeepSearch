@@ -54,11 +54,35 @@ SEARXNG_ENABLED = get_bool("SEARXNG_ENABLED", False)
 
 WOLFRAM_APP_ID = os.getenv("WOLFRAM_APP_ID", "")
 
+# HuggingFace
+HUGGINGFACE_SEARCH_ENABLED = get_bool("HUGGINGFACE_SEARCH_ENABLED", False)
+HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN", "")
+# Comma-separated list: models,datasets,spaces,papers
+_hf_types_raw = os.getenv("HUGGINGFACE_SEARCH_TYPES", "models,datasets,spaces,papers")
+HUGGINGFACE_SEARCH_TYPES: list[str] = [
+    t.strip() for t in _hf_types_raw.split(",") if t.strip()
+]
+
+# arXiv
+ARXIV_SEARCH_ENABLED = get_bool("ARXIV_SEARCH_ENABLED", False)
+
+# GitHub
+GITHUB_SEARCH_ENABLED = get_bool("GITHUB_SEARCH_ENABLED", False)
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+# Comma-separated list: repos,code,issues
+_github_types_raw = os.getenv("GITHUB_SEARCH_TYPES", "repos,issues")
+GITHUB_SEARCH_TYPES: list[str] = [
+    t.strip() for t in _github_types_raw.split(",") if t.strip()
+]
+
 # Search
 MAX_SUB_QUESTIONS: int = get_int("MAX_SUB_QUESTIONS", 5)
 MAX_SEARCH_RESULTS: int = get_int("MAX_SEARCH_RESULTS", 5)
 SEARCH_TIMEOUT: int = get_int("SEARCH_TIMEOUT", 10)
 
+MAX_BREAK_QUESTIONS_ITERATIONS: int = get_int(
+    "MAX_BREAK_QUESTIONS_ITERATIONS", -1
+)  # -1 for unlimited iterations
 # Scraping
 SCRAPING_STRATEGY = os.getenv("SCRAPING_STRATEGY", "crawl4ai")
 MAX_SCRAPE_PAGES = get_int("MAX_SCRAPE_PAGES", 5)

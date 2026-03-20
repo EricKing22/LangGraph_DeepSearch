@@ -65,6 +65,7 @@ class WebSearchState(MessagesState):
     plan_a: str  # Agent's initial plan before human feedback
     plan_b: str  # Human-modified plan (final plan used for execution)
     lesson_learned: str | None  # Distilled lesson from plan comparison
+    feedback_count: int  # Number of human feedback iterations
 
 
 class Plan(MessagesState):
@@ -83,6 +84,7 @@ class Plan(MessagesState):
     recalled_notes: List[str]  # Notes retrieved from memory store
     plan_a: str  # Agent's initial plan before human feedback
     plan_b: str  # Human-modified plan (final plan used for execution)
+    feedback_count: int = 0  # Number of feedback iterations
 
 
 class Review(MessagesState):

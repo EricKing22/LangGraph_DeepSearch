@@ -1,6 +1,6 @@
 # LangGraph DeepSearch
 
-Reproducing deep search functionality using LangGraph framework with **Closed-loop Learning System**.
+A powerful **AI-powered deep research agent** built with LangGraph that combines **human-in-the-loop** control, **automatic quality review**, and **self-learning capabilities** to deliver high-quality research results across multiple platforms.
 
 > **⚠️ Development Status**: This project is currently under active development. More features and improvements will be added over time.
 
@@ -10,28 +10,59 @@ Reproducing deep search functionality using LangGraph framework with **Closed-lo
 
 *The LangGraph workflow showing the complete search pipeline with conditional edges, human-in-the-loop feedback, and iterative refinement.*
 
-## 🧠 Closed-loop Learning System
+---
 
-This project implements a **Closed-loop Learning System** that enables the agent to learn from human feedback and improve over time. The system follows three phases:
+## ✨ Key Features
 
-### Phase 1: Recall & Plan
-1. **Input**: User submits a task/query
-2. **Store Search**: Agent searches LangGraph Store for relevant past experiences
-3. **Draft Plan**: Agent generates initial sub-questions (Plan A) incorporating recalled lessons
+### 1. 🔄 Human-in-the-Loop Control
+Full control over the research process with interruptible workflows:
+- **Plan Review**: Review and modify AI-generated sub-questions before execution
+- **Iterative Refinement**: Provide feedback to improve search strategy
+- **Transparent Decision-Making**: See exactly what the agent is planning to search for
 
-### Phase 2: Human-in-the-loop
-4. **Interrupt**: Workflow pauses to show Plan A to human
-5. **Human Correction**: Human reviews and optionally modifies the plan (Plan B)
-6. **Execute**: Agent executes the search with the final plan
+### 2. 📊 Automatic Quality Review
+Built-in quality assurance with automatic scoring:
+- **Auto-Scoring**: Every summary receives a score (1-10) based on completeness and accuracy
+- **Strengths/Weaknesses Analysis**: Detailed feedback on what's good and what needs improvement
+- **Iterative Improvement**: Low scores trigger automatic re-generation with specific improvement focus
 
-### Phase 3: Reflect & Memorize
-7. **Compare**: After task completion, compare Plan A and Plan B
-8. **Distill**: LLM analyzes differences and extracts actionable lessons
-9. **Store**: Save new lessons to LangGraph Store for future use
+### 3. 🧠 Self-Learning System (Closed-loop Learning)
+The agent learns from every interaction to improve over time:
+- **Recall Past Experiences**: Before planning, the agent recalls relevant lessons from previous tasks
+- **Compare Plan A & B**: Analyzes the difference between AI's initial plan and human-modified plan
+- **Extract Actionable Lessons**: LLM distills meaningful insights from human corrections
+- **Persistent Memory**: Stores lessons in LangGraph Store for cross-session learning
 
-**Key Benefit**: Over time, as the agent accumulates lessons, it will generate better initial plans that require less human correction!
+> **Key Benefit**: Over time, the agent generates better initial plans that require less human correction.
 
-**Technical Note**: Learning uses **LangGraph Store** (not Checkpointer) for persistent, cross-session memory. Store saves lessons globally with vector embeddings for semantic search, while Checkpointer only saves per-thread conversation state. The learn subgraph runs asynchronously after task completion to avoid blocking the main workflow.
+### 4. 🌐 Multi-Platform Search
+Search across multiple platforms in a single query:
+
+| Platform | Flag | What it searches |
+|---|---|---|
+| **Web** (Tavily) | `--sources web` | General web, news, documentation |
+| **HuggingFace** | `--sources hf` | ML models, datasets, spaces, papers |
+| **arXiv** | `--sources arxiv` | Academic research papers |
+| **GitHub** | `--sources github` | Repositories, issues, code (token needed for code) |
+
+Combine platforms freely: `--sources web hf arxiv github`
+
+---
+
+## ⚙️ How the Three Core Mechanisms Work Together
+
+```
+Before Search          After Search           After Completion
+─────────────          ────────────           ────────────────
+Agent → Plan A    →    Summary generated  →   Compare Plan A vs B
+User modifies          Auto-scored (1-10)      Extract lesson
+     ↓                      ↓                  Save to memory
+   Plan B             score > 7 → done
+     ↓                score ≤ 7 → improve
+  Execute
+```
+
+---
 
 ## 📚 Why LangGraph?
 
@@ -41,14 +72,16 @@ This project implements a **Closed-loop Learning System** that enables the agent
 - **Checkpointing**: Resume interrupted searches and inspect intermediate states
 - **Human-in-the-Loop**: Easy integration of human feedback during search process
 - **Streaming Support**: Real-time results as the search progresses
-- **Composability**: Modular nodes that can be reused and recombined
 
-## Quick Start
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python 3.11+
-- LangGraph CLI (`pip install langgraph-cli`)
+- Python 3.12+
+- An OpenAI-compatible API key
+- Tavily API key (for web search)
 
 ### Installation
 
@@ -65,181 +98,441 @@ cp .env.example .env
 # Edit .env with your API keys
 ```
 
-### Environment Configuration
-
-Create a `.env` file in the project root with the following variables:
+### Minimal `.env` Configuration
 
 ```env
-# LLM Configuration (choose one or more)
+# LLM
 OPENAI_API_KEY=your_openai_api_key
 OPENAI_MODEL=gpt-4o
-OPENAI_TEMPERATURE=0.7
 
-# Search API
+# Web search (required for --sources web)
 TAVILY_API_KEY=your_tavily_api_key
 
-# Search Configuration
-MAX_SUB_QUESTIONS=5
-MAX_SEARCH_RESULTS=5
-SEARCH_TIMEOUT=10
+# HuggingFace search (optional, no key needed for public content)
+HUGGINGFACE_SEARCH_ENABLED=false
+# HUGGINGFACE_TOKEN=hf_...   # only needed for private/gated models
+
+# arXiv search (optional, no API key required)
+ARXIV_SEARCH_ENABLED=false
+
+# GitHub search (optional)
+GITHUB_SEARCH_ENABLED=false
+# GITHUB_TOKEN=ghp_...  # recommended: raises rate limit and enables code search
 ```
 
-## Deployment & Usage
+---
 
-### Local Development with LangGraph Dev
+## 💻 CLI Usage
 
-The easiest way to run and test this project is using `langgraph dev`:
+### Check Active Configuration
 
 ```bash
-# Start the LangGraph development server
+deepsearch --show-config
+```
+
+```
+⚙️  Active Configuration
+============================================================
+  LLM Provider      : OpenAI
+  OpenAI Model      : gpt-4o
+  Search Sources    : web, hf, arxiv
+  Tavily API Key    : ✓ set
+  HuggingFace Search: enabled
+  HF Search Types   : models, datasets, spaces, papers
+  HF Token          : ✗ not set (public only)
+  arXiv Search      : enabled
+  Max Sub-Questions : 5
+  Max Search Results: 5
+  Max Review Loops  : 1
+  Self-Learning     : enabled
+============================================================
+```
+
+---
+
+### 🌐 Web Research (Tavily)
+
+General web research — news, documentation, blog posts, official sites.
+
+```bash
+# Basic web research
+deepsearch --query "What is the difference between LangSmith and LangGraph?"
+
+# Web-only research with custom thread for continuity
+deepsearch --query "Latest developments in AI agents" \
+           --sources web \
+           --thread-id ai-agents-research
+
+# Skip human review step (auto-approve sub-questions)
+deepsearch --query "How does RAG work in production?" \
+           --sources web \
+           --no-feedback
+
+# Verbose output with source details and node execution trace
+deepsearch --query "Transformer architecture explained" \
+           --sources web \
+           --verbose
+```
+
+**Example session:**
+
+```
+🔍 Processing query ... [WEB]
+
+🤖 [recall] Recalled 1 past experience(s):
+- When researching architecture topics, include both theory and practical examples
+
+🤖 [plan] I'm now going to search for these topics:
+**1**. What is the Transformer architecture and its key components?
+**2**. How does self-attention mechanism work in Transformers?
+**3**. What are practical applications of Transformer models?
+
+🤖 [feedback] I've generated the following sub-questions:
+
+1. What is the Transformer architecture and its key components?
+2. How does self-attention mechanism work in Transformers?
+3. What are practical applications of Transformer models?
+
+Please provide feedback (or press Enter to approve):
+
+Your feedback: ↵
+
+🤖 [search_web] [WEB] Search for: **Transformer architecture** (Found 4 relevant results)
+🤖 [search_web] [WEB] Search for: **self-attention mechanism** (Found 5 relevant results)
+🤖 [search_web] [WEB] Search for: **Transformer applications** (Found 3 relevant results)
+
+🤖 [summarise] [Generating comprehensive answer...]
+
+============================================================
+🎯 FINAL SEARCH RESULTS
+============================================================
+
+📄 Summary:
+# Transformer Architecture
+
+...
+
+⭐ Review Score: 8/10  [████████░░]
+💪 Strengths  : Comprehensive coverage of attention mechanism...
+📚 Sources consulted: 12 (12 web)
+```
+
+---
+
+### 🤗 HuggingFace Research
+
+Research ML models, datasets, demo spaces, and HuggingFace papers.
+
+```bash
+# Enable HuggingFace search via flag (overrides .env setting)
+deepsearch --query "Best open-source LLMs for code generation" \
+           --sources hf
+
+# Combine web + HuggingFace for richer results
+deepsearch --query "Multimodal vision-language models" \
+           --sources web hf
+
+# Research a specific model type — HuggingFace only, more focused
+deepsearch --query "Text-to-image diffusion models" \
+           --sources hf \
+           --max-questions 3 \
+           --no-feedback
+```
+
+**Example output (HuggingFace sources):**
+
+```
+🔍 Processing query ... [HF]
+
+🤖 [plan] I'm now going to search for these topics:
+**1**. Top HuggingFace models for code generation with benchmark scores
+**2**. Available code generation datasets on HuggingFace Hub
+**3**. Interactive code generation demos on HuggingFace Spaces
+
+[After search...]
+
+📄 Summary:
+## Best Open-Source LLMs for Code Generation
+
+### Top Models
+- **[HF Model] Qwen/Qwen2.5-Coder-32B-Instruct** — ...
+- **[HF Model] deepseek-ai/DeepSeek-Coder-V2** — ...
+
+### Key Datasets
+- **[HF Dataset] bigcode/the-stack-v2** — ...
+
+...
+
+⭐ Review Score: 9/10  [█████████░]
+📚 Sources consulted: 8 (8 HuggingFace)
+```
+
+**Persist a HuggingFace research session:**
+
+```bash
+# Start a research thread
+deepsearch --query "RLHF training techniques" \
+           --sources web hf \
+           --thread-id rlhf-research
+
+# Continue the same thread later with a follow-up
+deepsearch --query "RLHF vs DPO comparison" \
+           --sources web hf \
+           --continue rlhf-research
+```
+
+---
+
+### 📄 arXiv Academic Research
+
+Deep-dive into peer-reviewed research papers. No API key required.
+
+```bash
+# Pure academic research via arXiv
+deepsearch --query "Mixture of Experts scaling laws" \
+           --sources arxiv
+
+# Combine web + arXiv for both theory and practical coverage
+deepsearch --query "Mechanistic interpretability in large language models" \
+           --sources web arxiv
+
+# All three platforms: web context + HuggingFace implementations + arXiv papers
+deepsearch --query "State space models vs Transformers" \
+           --sources web hf arxiv \
+           --max-questions 4
+```
+
+**Example output (arXiv sources):**
+
+```
+🔍 Processing query ... [ARXIV]
+
+🤖 [plan] I'm now going to search for these topics:
+**1**. Mixture of Experts architecture and theoretical foundations
+**2**. Scaling laws for MoE models compared to dense transformers
+**3**. Recent MoE implementations and benchmark results
+
+[After search...]
+
+📄 Summary:
+## Mixture of Experts: Scaling Laws
+
+### Key Papers
+- **[arXiv] Mixtral of Experts** (Jiang et al., 2024)
+  arXiv:2401.04088 — Introduces sparse MoE with 8 experts per layer...
+
+- **[arXiv] Scaling Laws for Fine-Grained Mixture of Experts**
+  arXiv:2402.07871 — Derives optimal expert count vs. compute tradeoffs...
+
+...
+
+⭐ Review Score: 9/10  [█████████░]
+📚 Sources consulted: 10 (10 arXiv)
+```
+
+---
+
+### 🐙 GitHub Research
+
+Find open-source projects, code implementations, and developer discussions.
+
+> **Rate limits**: Without a token — 10 search requests/minute (repos + issues only).
+> Set `GITHUB_TOKEN` in `.env` to get 30 req/min and unlock code search.
+
+```bash
+# Find open-source implementations of a concept
+deepsearch --query "LangGraph multi-agent orchestration" \
+           --sources github
+
+# GitHub + web for broader coverage
+deepsearch --query "vector database comparison Pinecone Weaviate Chroma" \
+           --sources web github
+
+# GitHub + arXiv: find both papers and implementations
+deepsearch --query "graph neural networks node classification" \
+           --sources github arxiv
+
+# Search repositories AND code (requires GITHUB_TOKEN)
+# Set GITHUB_SEARCH_TYPES=repos,issues,code in .env first
+deepsearch --query "flash attention CUDA implementation" \
+           --sources github \
+           --no-feedback
+```
+
+**Example output (GitHub sources):**
+
+```
+🔍 Processing query ... [GITHUB]
+
+🤖 [plan] I'm now going to search for these topics:
+**1**. LangGraph multi-agent orchestration repositories and examples
+**2**. Open issues and discussions around LangGraph agent coordination
+**3**. Existing frameworks built on top of LangGraph
+
+[After search...]
+
+📄 Summary:
+## LangGraph Multi-Agent Orchestration
+
+### Top Repositories
+- **[GitHub Repo] langchain-ai/langgraph** ⭐ 12,400
+  The official LangGraph repository — build stateful, multi-actor applications with LLMs...
+
+- **[GitHub Repo] Onelevenvy/flock** ⭐ 2,100
+  Workflow-based low-code platform for multi-agent teams powered by LangGraph...
+
+### Relevant Issues & Discussions
+- **[GitHub Issue] Multi-agent communication patterns in LangGraph**
+  Open · 14 comments · Labels: enhancement, agents
+
+...
+
+⭐ Review Score: 8/10  [████████░░]
+📚 Sources consulted: 9 (9 GitHub)
+```
+
+**Continue a GitHub research session:**
+
+```bash
+# Start exploring a topic
+deepsearch --query "LLM inference optimization techniques" \
+           --sources web github \
+           --thread-id llm-inference
+
+# Follow up on a specific finding
+deepsearch --query "PagedAttention vLLM implementation details" \
+           --sources github arxiv \
+           --continue llm-inference
+```
+
+---
+
+### 🔀 Combined Multi-Platform Research
+
+Use all sources together for the most comprehensive results.
+
+```bash
+# Full research: web + HuggingFace models + arXiv papers + GitHub repos
+deepsearch --query "Retrieval-Augmented Generation best practices" \
+           --sources web hf arxiv github
+
+# Academic + implementations (great for replicating papers)
+deepsearch --query "LoRA fine-tuning for vision models" \
+           --sources hf arxiv github \
+           --max-questions 5 \
+           --verbose
+
+# Find papers AND open-source code for a technique
+deepsearch --query "speculative decoding LLM inference" \
+           --sources web arxiv github \
+           --no-feedback
+
+# Everything: latest news + models + papers + code
+deepsearch --query "multimodal large language models 2024" \
+           --sources web hf arxiv github \
+           --max-questions 4
+```
+
+**Source breakdown in output:**
+
+```
+📚 Sources consulted: 22 (5 web, 6 HuggingFace, 6 arXiv, 5 GitHub)
+```
+
+---
+
+### 📋 All CLI Flags
+
+```
+usage: deepsearch [-q QUERY] [--sources SOURCE [SOURCE ...]]
+                  [--max-questions N] [--no-feedback] [--verbose]
+                  [--thread-id ID] [--continue THREAD_ID]
+                  [--show-config] [--list-threads] [--show-memory]
+
+Core:
+  -q, --query TEXT          The search query to process
+  --thread-id ID            Custom thread ID (auto-generated if omitted)
+
+Search Control:
+  --sources SOURCE ...      Backends: web | hf | arxiv | github  (default: env config)
+  --max-questions N         Override max sub-questions for this run
+  --no-feedback             Auto-approve generated sub-questions
+
+Output:
+  -v, --verbose             Show node execution trace and full source list
+
+Utilities:
+  --show-config             Display active configuration and exit
+  --list-threads            List conversation threads (requires LangGraph Studio)
+  --show-memory             Show memory store info
+  --continue THREAD_ID      Resume a previous conversation thread
+```
+
+---
+
+## 🛠️ Local Development with LangGraph Studio
+
+For visual debugging and graph inspection:
+
+```bash
 langgraph dev
 ```
 
-This command will:
-- Start a local API server (default: http://localhost:2024)
-- Enable the LangGraph Studio UI for visual debugging
-- Provide hot-reload for code changes
-- Set up automatic checkpointing for conversation state
+This starts a local API server at `http://localhost:2024` with:
+- Visual graph execution in LangGraph Studio
+- Hot-reload on code changes
+- Automatic checkpointing
+- Memory store inspection
 
-### Command Line Interface (CLI)
+If port 2024 is in use: `langgraph dev --port 8080`
 
-For quick searches without the development server, use the CLI directly:
+---
 
-#### Basic Usage
-
-```bash
-# Simple query
-deepsearch --query "What is the difference between LangSmith and LangGraph?"
-
-# Query with custom thread ID (useful for maintaining separate conversation contexts)
-deepsearch --query "What are the benefits of using LangGraph?" --thread-id "conversation-123"
-
-# Multi-word queries (quotes required)
-deepsearch --query "How does quantum computing differ from classical computing?"
-```
-
-#### CLI Workflow
-
-When you run a query via CLI, the following happens:
-
-1. **Query Processing**: Your query is analyzed and decomposed into sub-questions
-2. **Human Feedback** (Interactive): You'll be prompted to review and provide feedback on the generated sub-questions
-   - Press Enter to proceed with the current questions
-   - Provide feedback to refine the questions
-3. **Web Search**: Each sub-question is searched using Tavily API
-4. **Result Synthesis**: Results are compiled into a comprehensive answer with citations
-5. **Quality Review**: The answer is automatically reviewed and scored
-6. **Final Output**: Displays the complete answer with sources
-
-#### Interactive Feedback Example
-
-```
-🔍 Processing query ...
-✓ Query processed!
-
-🤖 [plan] I'm now going to search for these topics:
-**1**. What is LangSmith and what are its primary features?
-**2**. What is LangGraph and what are its primary features?
-
-💬 Please provide feedback on the sub-questions:
-(Press Enter with no input to proceed as-is)
-
-Your feedback: Add a question about pricing differences
-
-✓ Received feedback: Add a question about pricing differences
-
-[Processing continues with updated questions...]
-```
-
-#### Output Format
-
-The CLI provides structured output with:
-- 🔍 Processing indicator
-- 🤖 Node-level outputs (shows which component is working)
-- 📄 Final summary with detailed analysis
-- 📚 Number of sources consulted
-- Citations in IEEE reference style
-
-#### Tips
-
-- **Use quotes** around your query if it contains multiple words
-- **Thread IDs** allow you to maintain separate conversation contexts for different topics
-- **Feedback is optional** - press Enter (empty message) to skip and proceed with generated sub-questions
-- **Interruption** - Press `Ctrl+C` to cancel a search in progress
-
-### How It Works
-
-1. **Query Extraction**: Extracts the user's query from messages
-2. **Query Analysis**: Decides whether to break down the query into sub-questions
-3. **Question Generation** (Optional): Creates focused sub-questions for comprehensive search
-4. **Web Search**: Executes Tavily searches for each question
-5. **Relevance Filtering**: Uses LLM to filter out irrelevant results
-6. **Synthesis**: Generates a comprehensive answer with citations
-
-### Features
-
-- **Automatic State Management**: LangGraph Cloud handles checkpointing automatically
-- **Multi-turn Conversations**: Each thread maintains conversation history
-- **Human-in-the-Loop**: Support for human feedback during question generation
-- **Iterative Refinement**: Can regenerate sub-questions based on feedback
-- **Source Attribution**: Includes citations to original sources
-
-
-## Troubleshooting
-
-### Command Not Found: `langgraph`
-
-Install the LangGraph CLI:
-
-```bash
-pip install langgraph-cli
-```
-
-### Port Already in Use
-
-If port 2024 is already in use, specify a different port:
-
-```bash
-langgraph dev --port 8080
-```
-
-### API Key Issues
-
-Ensure your `.env` file is properly configured
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 LangGraph_DeepSearch/
 ├── src/
 │   ├── graphs/
-│   │   └── web_search_graph.py    # Main graph definition
+│   │   └── web_search_graph.py    # Main graph definition and edge routing
 │   ├── nodes/
-│   │   ├── question_nodes.py      # Query processing and planning nodes
-│   │   ├── search_nodes.py        # Web search execution nodes
-│   │   ├── review_nodes.py        # Quality review and scoring nodes
-│   │   └── learning_nodes.py      # Closed-loop learning nodes (recall, compare, learn)
+│   │   ├── question_nodes.py      # Planning, summarise, review routing
+│   │   ├── search_nodes.py        # Multi-platform search orchestration
+│   │   ├── review_nodes.py        # Quality scoring (1-10)
+│   │   └── learning_nodes.py      # Recall, compare, learn nodes
 │   ├── state/
-│   │   └── states.py              # State schemas (WebSearchState, Search, etc.)
+│   │   └── states.py              # WebSearchState, Search, Plan, etc.
 │   ├── tools/
-│   │   ├── search_tool.py         # Tavily search integration
-│   │   └── consult_note.py        # LangGraph Store integration for lessons
+│   │   ├── search_tool.py         # Tavily web search
+│   │   ├── huggingface_tool.py    # HuggingFace Hub search
+│   │   ├── arxiv_tool.py          # arXiv paper search
+│   │   ├── github_tool.py         # GitHub repos, issues, and code search
+│   │   └── consult_note.py        # LangGraph Store (lessons memory)
 │   ├── prompts/
 │   │   └── search_prompts.py      # LLM prompts for all nodes
-│   ├── utils/                     # Utility functions
 │   ├── cli.py                     # Command-line interface
-│   ├── config.py                  # Configuration management & logging setup
-│   ├── llm.py                     # LLM initialization
-│   └── __init__.py                # Package initialization
+│   ├── config.py                  # Configuration & logging
+│   └── llm.py                     # LLM provider initialization
 ├── tests/
-│   ├── test_graphs.py             # Graph tests
-│   ├── test_nodes.py              # Node tests
-│   └── test_tools.py              # Tool tests
-├── langgraph.json                 # LangGraph configuration (includes Store config)
-├── .env                           # Environment variables (create from .env.example)
+│   ├── test_graphs.py
+│   ├── test_nodes.py
+│   └── test_tools.py
+├── langgraph.json                 # LangGraph config (Store, graph entrypoint)
 ├── .env.example                   # Environment template
-├── pyproject.toml                 # Project dependencies & metadata
-├── requirements.txt               # Python dependencies
-├── LICENSE                        # License file
-└── README.md                      # This file
+├── pyproject.toml                 # Dependencies & CLI entrypoint
+└── README.md
 ```
+
+---
+
+## 🔧 Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `command not found: deepsearch` | Run `pip install -e .` in the project root |
+| `TAVILY_API_KEY not set` | Add key to `.env` or skip web with `--sources hf arxiv github` |
+| `huggingface_hub not found` | Run `pip install huggingface_hub` |
+| GitHub rate limit (429) | Set `GITHUB_TOKEN` in `.env` to raise limit to 30 req/min |
+| GitHub code search empty | Code search requires `GITHUB_TOKEN` to be set |
+| Port 2024 in use | `langgraph dev --port 8080` |
+| Low review scores | Provide feedback at the sub-question prompt to guide the search |

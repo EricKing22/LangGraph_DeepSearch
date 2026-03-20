@@ -1,54 +1,13 @@
 from pydantic import BaseModel, Field
-from langchain.messages import SystemMessage, AIMessage
-from src.state import LearningState, RecallState
+from langchain.messages import SystemMessage
+from src.state import LearningState
 from src.llm import report_llm  # Use same model as summarise
-from src.tools.consult_note import recall_notes, save_lesson
+from src.tools.memory_store import save_memory
 from src.prompts import WRITE_NOTES_PROMPT
-from langgraph.config import get_store
 from langgraph.graph import END
 import logging
 
 logger = logging.getLogger("LangGraph_DeepSearch.learning_nodes")
-
-
-async def recall_from_memory(state: RecallState):
-    """
-    Search Memory (Store Search)
-    Agent searches the LangGraph Store for relevant past experiences.
-    Returns recalled notes to help with planning.
-
-    This is a generic function that can be reused in any graph that needs
-    to recall from memory.
-    """
-    query = state.get("query", "")
-    if not query:
-        # Try to extract from messages
-        from langchain.messages import HumanMessage
-
-        for message in reversed(state.get("messages", [])):
-            if isinstance(message, HumanMessage):
-                query = message.content
-                break
-
-    store = get_store()
-    recalled_notes = await recall_notes(store, query, limit=3)
-
-    notes_summary = ""
-    if recalled_notes:
-        notes_summary = "\n".join(f"- {note}" for note in recalled_notes)
-        message_content = f"Recalled past experiences from memory:\n{notes_summary}"
-    else:
-        message_content = (
-            "No relevant past experiences found. Planning based on current task."
-        )
-
-    logger.debug(f"Recalled {len(recalled_notes)} notes for query: {query[:50]}...")
-
-    return {
-        "query": query,
-        "recalled_notes": recalled_notes,
-        "messages": [AIMessage(content=message_content)],
-    }
 
 
 async def compare_and_learn(state: LearningState):
@@ -104,9 +63,8 @@ async def compare_and_learn(state: LearningState):
         result = await structured_llm.ainvoke([SystemMessage(content=prompt)])
 
         if result.has_lesson and result.lesson:
-            # Save the lesson to store
-            store = get_store()
-            await save_lesson(store, result.lesson, query)
+            # Persist lesson to file-based store (~/.deepsearch/memories.json)
+            save_memory(result.lesson, query)
 
             logger.info(f"[ASYNC LEARNING] Learned new lesson: {result.lesson}")
 

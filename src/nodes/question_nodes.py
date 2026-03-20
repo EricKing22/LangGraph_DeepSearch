@@ -3,10 +3,12 @@ from src.state import Plan, WebSearchState
 from typing import List, Literal
 from src.llm import question_llm as llm
 from src.llm import report_llm as summarize_llm
-from langgraph.types import Send
+from langgraph.types import Send, interrupt
 from langgraph.graph import END
 from langchain.messages import SystemMessage, HumanMessage, AIMessage
 from src.prompts import BREAK_QUESTIONS_PROMPT, SYNTHESIS_PROMPT
+from src.tools.search_tool import get_date
+from src.tools.memory_store import search_memories, get_memory
 from src import config
 import logging
 
@@ -62,17 +64,14 @@ async def plan(state: Plan):
     questions = state.get("questions", [])
     human_feedback = state.get("human_feedback", "")
     score = state.get("score", None)
-    recalled_notes = state.get("recalled_notes", [])
 
     class Sub_Questions(BaseModel):
         questions: List[str] = Field(
-            description="Sub queries generated from the original query to explore different angles and aspects of the topic.",
+            description="Sub queries generated from the original query. Must be in the same language as the original query.",
         )
         reason: str = Field(
-            description="The reasoning behind the generated sub-questions, explaining how they relate to the original query and cover different aspects of the topic.",
+            description="The reasoning behind the generated sub-questions. Must be in the same language as the original query.",
         )
-
-    structured_llm = llm.with_structured_output(Sub_Questions)
 
     messages = [
         SystemMessage(
@@ -80,15 +79,6 @@ async def plan(state: Plan):
             + f"\nRemember the max number of sub questions shouldn't exceed {config.MAX_SUB_QUESTIONS}."
         )
     ]
-
-    # Incorporate recalled notes from memory (Closed-loop Learning)
-    if recalled_notes:
-        notes_str = "\n".join(f"- {note}" for note in recalled_notes)
-        messages.append(
-            SystemMessage(
-                content=f"[IMPORTANT] Below are the notes retrieved from past failures, please consider in later planning:\n{notes_str}"
-            )
-        )
 
     if questions:
         messages.append(SystemMessage(content=f"Current sub questions: {questions}"))
@@ -111,6 +101,26 @@ async def plan(state: Plan):
             )
         )
 
+    # Step 1: Let LLM use tools — memory recall + date — before generating sub-questions.
+    # Progressive disclosure: LLM calls search_memories() for brief previews,
+    # then get_memory(id) for full detail on specific lessons it finds relevant.
+    tools = [search_memories, get_memory, get_date]
+    llm_with_tools = llm.bind_tools(tools)
+    tool_response = await llm_with_tools.ainvoke(messages)
+
+    # Execute tool calls in a loop — LLM may chain search_memories → get_memory
+    from langgraph.prebuilt import ToolNode
+
+    tool_node = ToolNode(tools)
+    while hasattr(tool_response, "tool_calls") and tool_response.tool_calls:
+        messages.append(tool_response)
+        tool_result = await tool_node.ainvoke({"messages": [tool_response]})
+        messages.extend(tool_result.get("messages", []))
+        # Let LLM decide if it needs another tool call (e.g. get_memory after search)
+        tool_response = await llm_with_tools.ainvoke(messages)
+
+    # Step 2: Generate structured sub-questions (with tool context if any)
+    structured_llm = llm.with_structured_output(Sub_Questions)
     results = await structured_llm.ainvoke(messages)
     questions = results.questions
     reason = results.reason
@@ -154,107 +164,83 @@ def should_skip_human_feedback(state: Plan):
         return "human_feedback"
 
 
-async def should_break_query(state: Plan):
+def should_break_query(state: Plan):
     """
     Decide the next step based on human feedback.
+    If user approved (empty feedback), go to search_web.
+    If user provided feedback, go back to plan to regenerate questions.
     """
-
-    class Router(BaseModel):
-        """
-        Router node that decides the next step based on human feedback.
-        """
-
-        next_step: Literal["search_web", "plan"] = Field(
-            description="The next step to execute. Possible values: 'search_web' or 'plan'.",
-        )
-        reason: str = Field(
-            description="The reasoning behind the decision.",
-        )
-
-    structured_router = llm.with_structured_output(Router)
-
-    # Extract query from state or messages
-    query = state.get("query", "")
-    if not query:
-        for message in reversed(state.get("messages", [])):
-            if isinstance(message, HumanMessage):
-                query = message.content
-                break
-
-    if not query:
-        raise ValueError("No query found in state or message history")
-
-    questions = state.get("questions", [])
-
-    messages = [HumanMessage(content=query)]
-    if questions:
-        questions_str = "\n".join(f"{idx + 1}. {q}" for idx, q in enumerate(questions))
-        messages.append(
-            SystemMessage(
-                content=f"These are the previous generated questions:\n{questions_str}"
-            )
-        )
-
+    APPROVAL_MESSAGE = "The questions look good, please proceed."
     human_feedback = state.get("human_feedback", "")
-    if human_feedback:
-        logger.debug("Considering human feedback ...")
-        messages.append(HumanMessage(content=f"Human Feedback: {human_feedback}"))
 
-    messages.append(
-        SystemMessage(
-            content="Based on the above information, decide the next step. "
-            "If you are happy with the current sub questions return 'search_web' in 'next_step'. "
-            "If you need to create more or rewrite sub-questions based on human feedback, return 'plan' in 'next_step'."
-            "You should put your reasoning in the 'reason' field, use question index to help understanding."
-            f"Remember the max number of sub questions shouldn't exceed {config.MAX_SUB_QUESTIONS}."
-            "Your response should be in JSON format with 'next_step' and 'reason' fields."
-        )
-    )
-
-    result = await structured_router.ainvoke(messages)
-    next_step = result.next_step
-    next_step_reason = result.reason
-
-    # Check the number of iterations to prevent infinite loops
-    break_iteration = state.get("break_questions_iterations_count", 0)
-    if break_iteration >= 3:
-        logger.debug(
-            f"Reached maximum break iterations ({break_iteration}). Forcing next step to 'search_web'."
-        )
-        next_step = "search_web"
-
-    # Log the router decision and reasoning for debugging and transparency
-    logger.debug(f"Router decision: {next_step}")
-    logger.debug(f"Router reasoning: {next_step_reason}")
-
-    if next_step == "plan":
-        return next_step
-    else:
+    if human_feedback == APPROVAL_MESSAGE:
+        logger.debug("User approved the questions, proceeding to search")
         return map_search(state)
+
+    # Check iteration limit
+    feedback_count = state.get("feedback_count", 0)
+    if (
+        config.MAX_BREAK_QUESTIONS_ITERATIONS != -1
+        and feedback_count >= config.MAX_BREAK_QUESTIONS_ITERATIONS
+    ):
+        logger.debug(
+            f"Reached maximum feedback iterations ({feedback_count}). Forcing search."
+        )
+        return map_search(state)
+
+    logger.debug(
+        f"User provided feedback, routing back to plan (iteration {feedback_count})"
+    )
+    return "plan"
 
 
 def human_feedback(state: Plan):
     """
-    Collect human feedback on the generated sub-questions to improve them iteratively.
-    This node can be used to capture human feedback and update the state accordingly for the next iteration of question planning.
-    Also captures Plan B (inline plan capture).
+    Collect human feedback using interrupt().
+    On first run the function pauses at interrupt(); on resume it re-executes
+    and interrupt() returns the value passed via Command(resume=...).
     """
-    feedback = ""
-    for message in reversed(state.get("messages", [])):
-        if isinstance(message, HumanMessage):
-            feedback = message.content
-            break
-    logger.debug("Feedback Received")
-
-    # Capture Plan B (human-modified plan)
     questions = state.get("questions", [])
-    plan_content = ""
-    if feedback:
-        plan_content += f"### Human Feedback:\n{feedback}\n\n"
+    questions_display = "\n".join(f"{i + 1}. {q}" for i, q in enumerate(questions))
 
-    plan_content += "\n".join(f"{i + 1}. {q}" for i, q in enumerate(questions))
+    # Pauses here on first run; returns resume value on replay
+    feedback = interrupt(
+        f"🤖 [feedback] I've generated the following sub-questions:\n\n{questions_display}\n\n"
+        "Please provide feedback (or press Enter to approve):"
+    )
 
-    return {"human_feedback": feedback, "plan_b": plan_content}
+    # Empty feedback = approval
+    if not feedback or not feedback.strip():
+        feedback = "The questions look good, please proceed."
+        logger.info("User approved the questions with no feedback.")
+
+    logger.debug(f"Feedback received: {feedback}")
+
+    # Build cumulative Plan B
+    feedback_count = state.get("feedback_count", 0)
+    existing_plan_b = state.get("plan_b", "")
+
+    if feedback != "The questions look good, please proceed.":
+        feedback_count += 1
+
+    questions_str = "\n".join(f"{i + 1}. {q}" for i, q in enumerate(questions))
+    if feedback_count <= 1 or not existing_plan_b:
+        plan_content = (
+            f"### Iteration {feedback_count} - Human Feedback:\n{feedback}\n\n"
+        )
+        plan_content += f"#### Questions:\n{questions_str}"
+    else:
+        plan_content = (
+            existing_plan_b
+            + f"\n\n### Iteration {feedback_count} - Human Feedback:\n{feedback}\n\n"
+        )
+        plan_content += f"#### Questions:\n{questions_str}"
+
+    return {
+        "human_feedback": feedback,
+        "plan_b": plan_content,
+        "feedback_count": feedback_count,
+    }
 
 
 def map_search(state: Plan):
@@ -378,7 +364,7 @@ async def is_review_finished(state: WebSearchState):
     """
     # This is a placeholder implementation. You can design your own logic or LLM prompt to make this decision.
     query = state.get("query", "")
-    score = state.get("score", "5")
+    score = state.get("score", None) or 0
     strengths = state.get("strengths", "")
     weaknesses = state.get("weaknesses", "")
 

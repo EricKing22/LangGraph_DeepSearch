@@ -1,6 +1,4 @@
 from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.store.memory import InMemoryStore
 from src.state import WebSearchState
 from src.nodes.question_nodes import (
     plan,
@@ -13,56 +11,35 @@ from src.nodes.question_nodes import (
 )
 from src.nodes.search_nodes import search_web
 from src.nodes.review_nodes import review
-from src.nodes.learning_nodes import recall_from_memory
 from src.graphs.learn_graph import learn_graph
-from src import config
 import logging
 
 logger = logging.getLogger("LangGraph_DeepSearch.web_search_graph")
 
-
-def should_start_with_recall(state: WebSearchState):
-    """
-    Conditional edge from START: decide whether to recall from memory first.
-    If ENABLE_LEARNING is True, start with recall to get past experiences.
-    Otherwise, skip directly to "plan".
-    """
-    if config.ENABLE_LEARNING:
-        logger.debug("Learning enabled: Starting with recall from memory")
-        return "recall"
-    else:
-        logger.debug("Learning disabled: Skipping directly to plan")
-        return "plan"
-
-
 # Build the graph with Closed-loop Learning System
-# Flow: [recall] -> plan -> human_feedback -> search -> summarise [→ async learn] -> review
+# Memory recall is now done as a skill (tool call) inside the plan node itself,
+# using progressive disclosure: search_memories() → get_memory(id).
+# Flow: plan -> human_feedback -> search -> summarise [→ async learn] -> review
 builder = StateGraph(state_schema=WebSearchState)
 
-# Phase 1: Recall node (beginning only)
-builder.add_node("recall", recall_from_memory)
-
-# Phase 2: Planning nodes
+# Phase 1: Planning (memory recall embedded as tool calls inside this node)
 builder.add_node("plan", plan)
 
-# Phase 3: Human-in-the-loop nodes
+# Phase 2: Human-in-the-loop nodes
 builder.add_node("human_feedback", human_feedback)
 
-# Phase 4: Execution nodes
+# Phase 3: Execution nodes
 builder.add_node("search_web", search_web)
 builder.add_node("summarise", summarise)
 builder.add_node("review", review)
 
-# Phase 5: Async learning subgraph
+# Phase 4: Async learning subgraph
 builder.add_node("learn", learn_graph)
 
 # Edge Definitions
 
-# START: conditional based on ENABLE_LEARNING
-builder.add_conditional_edges(START, should_start_with_recall, ["recall", "plan"])
-
-# After recall: always go to plan
-builder.add_edge("recall", "plan")
+# START: always go directly to plan (memory access is a tool inside plan)
+builder.add_edge(START, "plan")
 
 # From plan: decide whether to get human feedback or skip
 builder.add_conditional_edges(
@@ -88,9 +65,6 @@ builder.add_conditional_edges("review", is_review_finished, ["plan", "summarise"
 # Learn subgraph always goes to END (it runs async)
 builder.add_edge("learn", END)
 
-# Compile
-checkpointer = MemorySaver()
-store = InMemoryStore()
-graph = builder.compile(
-    checkpointer=checkpointer, store=store, interrupt_before=["human_feedback"]
-)
+# Compile without checkpointer/store — langgraph dev provides these at runtime.
+# For CLI usage, compile via builder with checkpointer/store separately.
+graph = builder.compile()
