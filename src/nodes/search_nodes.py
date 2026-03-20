@@ -6,6 +6,7 @@ from langchain.messages import SystemMessage, AIMessage
 from src.tools.search_tool import search_tavily_impl, search_tavily, get_date
 from src.tools.huggingface_tool import search_huggingface_impl
 from src.tools.arxiv_tool import search_arxiv_impl
+from src.tools.github_tool import search_github_impl
 from src.prompts import RELEVANCE_CHECK_PROMPT
 from langgraph.prebuilt import ToolNode
 from langchain_core.runnables import RunnableConfig
@@ -81,6 +82,8 @@ def _get_search_sources(config: RunnableConfig) -> list[str]:
         sources.append("hf")
     if app_config.ARXIV_SEARCH_ENABLED:
         sources.append("arxiv")
+    if app_config.GITHUB_SEARCH_ENABLED:
+        sources.append("github")
     return sources
 
 
@@ -93,9 +96,10 @@ async def search_web(state: Search, config: RunnableConfig):
       - environment variables (HUGGINGFACE_SEARCH_ENABLED, ARXIV_SEARCH_ENABLED).
 
     Supported sources:
-      - "web"   : Tavily web search
-      - "hf"    : HuggingFace Hub (models, datasets, spaces, papers)
-      - "arxiv" : arXiv academic paper search
+      - "web"    : Tavily web search
+      - "hf"     : HuggingFace Hub (models, datasets, spaces, papers)
+      - "arxiv"  : arXiv academic paper search
+      - "github" : GitHub repositories, code, and issues
     """
     query = state.get("query")
     search_sources = _get_search_sources(config)
@@ -173,6 +177,18 @@ async def search_web(state: Search, config: RunnableConfig):
             logger.debug(f"arXiv search added {len(arxiv_results)} results")
         except Exception as e:
             logger.error(f"arXiv search failed for '{query}': {e}")
+
+    # ── GitHub search ─────────────────────────────────────────────────────────
+    if "github" in search_sources:
+        try:
+            github_results = search_github_impl(
+                query=query,
+                max_results=app_config.MAX_SEARCH_RESULTS,
+            )
+            results.extend(github_results)
+            logger.debug(f"GitHub search added {len(github_results)} results")
+        except Exception as e:
+            logger.error(f"GitHub search failed for '{query}': {e}")
 
     # ── Relevance filtering ───────────────────────────────────────────────────
     filtered_results = []

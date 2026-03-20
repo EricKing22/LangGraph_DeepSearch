@@ -39,6 +39,10 @@ def show_config():
         print(f"  HF Search Types   : {', '.join(app_config.HUGGINGFACE_SEARCH_TYPES)}")
         print(f"  HF Token          : {'✓ set' if app_config.HUGGINGFACE_TOKEN else '✗ not set (public only)'}")
     print(f"  arXiv Search      : {'enabled' if app_config.ARXIV_SEARCH_ENABLED else 'disabled'}")
+    print(f"  GitHub Search     : {'enabled' if app_config.GITHUB_SEARCH_ENABLED else 'disabled'}")
+    if app_config.GITHUB_SEARCH_ENABLED:
+        print(f"  GitHub Types      : {', '.join(app_config.GITHUB_SEARCH_TYPES)}")
+        print(f"  GitHub Token      : {'✓ set (code search enabled)' if app_config.GITHUB_TOKEN else '✗ not set (repos + issues only)'}")
 
     # Search params
     print(f"  Max Sub-Questions : {app_config.MAX_SUB_QUESTIONS}")
@@ -89,6 +93,8 @@ async def run_search(args, thread_id):
             search_sources.append("hf")
         if app_config.ARXIV_SEARCH_ENABLED:
             search_sources.append("arxiv")
+        if app_config.GITHUB_SEARCH_ENABLED:
+            search_sources.append("github")
 
     # Resolve max sub-questions (CLI flag > env config)
     max_questions = args.max_questions if args.max_questions else app_config.MAX_SUB_QUESTIONS
@@ -196,7 +202,8 @@ async def run_search(args, thread_id):
         sources_list = result["sources"]
         hf_count = sum(1 for s in sources_list if "[HF" in s.get("title", ""))
         arxiv_count = sum(1 for s in sources_list if "[arXiv]" in s.get("title", ""))
-        web_count = len(sources_list) - hf_count - arxiv_count
+        github_count = sum(1 for s in sources_list if "[GitHub" in s.get("title", ""))
+        web_count = len(sources_list) - hf_count - arxiv_count - github_count
 
         print(f"\n📚 Sources consulted: {len(sources_list)}", end="")
         breakdown = []
@@ -206,6 +213,8 @@ async def run_search(args, thread_id):
             breakdown.append(f"{hf_count} HuggingFace")
         if arxiv_count:
             breakdown.append(f"{arxiv_count} arXiv")
+        if github_count:
+            breakdown.append(f"{github_count} GitHub")
         if breakdown:
             print(f" ({', '.join(breakdown)})", end="")
         print()
@@ -262,10 +271,10 @@ Examples:
     parser.add_argument(
         "--sources",
         nargs="+",
-        choices=["web", "hf", "arxiv"],
+        choices=["web", "hf", "arxiv", "github"],
         metavar="SOURCE",
-        help="Search backends to use: 'web' (Tavily), 'hf' (HuggingFace), 'arxiv' (arXiv). "
-             "Defaults to env config. Example: --sources web hf arxiv",
+        help="Search backends: web (Tavily), hf (HuggingFace), arxiv, github. "
+             "Defaults to env config. Example: --sources web github arxiv",
     )
     parser.add_argument(
         "--max-questions",

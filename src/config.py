@@ -64,6 +64,13 @@ HUGGINGFACE_SEARCH_TYPES: list[str] = [t.strip() for t in _hf_types_raw.split(",
 # arXiv
 ARXIV_SEARCH_ENABLED = get_bool("ARXIV_SEARCH_ENABLED", False)
 
+# GitHub
+GITHUB_SEARCH_ENABLED = get_bool("GITHUB_SEARCH_ENABLED", False)
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+# Comma-separated list: repos,code,issues
+_github_types_raw = os.getenv("GITHUB_SEARCH_TYPES", "repos,issues")
+GITHUB_SEARCH_TYPES: list[str] = [t.strip() for t in _github_types_raw.split(",") if t.strip()]
+
 # Search
 MAX_SUB_QUESTIONS: int = get_int("MAX_SUB_QUESTIONS", 5)
 MAX_SEARCH_RESULTS: int = get_int("MAX_SEARCH_RESULTS", 5)
