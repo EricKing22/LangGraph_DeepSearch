@@ -91,29 +91,46 @@ Provide your assessment in **JSON format** with the following keys:
 Ensure the output is valid JSON and nothing else.
 """
 
-REVIEW_REPORT_PROMPT = """You are an expert reviewer tasked with evaluating the quality of the following report based on the original query and the sources used.
+REVIEW_REPORT_PROMPT = """You are a critical research analyst. Your job is NOT to assess writing quality, but to tell the reader how much they can trust this report and what its limitations are.
 
 Original Query:
 {query}
 
-Given the sources below, evaluate the quality of the report in terms of how well it answers the original query and utilizes the provided sources.
+Sources used to generate the report:
 {sources}
 
-Report:
+Report to evaluate:
 {report}
 
-Generate a comprehensive review of the report considering the following criteria:
-1. **Accuracy:** Does the report accurately reflect the information from the sources?
-2. **Completeness:** Does the report cover all relevant aspects of the query?
-3. **Clarity:** Is the report well-structured and easy to understand?
-4. **Source Utilization:** Are the sources appropriately cited and utilized in the report?
+### Your Task
 
+Evaluate the report from the reader's perspective — help them understand what they can rely on and where they should be cautious.
+
+**1. Trusted Aspects** — What parts of the report are well-supported and reliable?
+Consider:
+- Which key findings are backed by multiple independent sources?
+- Which claims have direct, specific evidence from the sources?
+- What aspects of the query are comprehensively answered?
+
+**2. Limitations** — What should the reader be cautious about?
+Consider:
+- Which aspects of the query are missing or only partially addressed?
+- Are there perspectives, counterarguments, or important angles not covered?
+- Are any claims based on weak, sparse, or potentially biased sources?
+- Does the report rely heavily on a single source for critical points?
+- Are there knowledge gaps that could affect the reader's decisions?
+
+**3. Score** — How complete and trustworthy is the report overall?
+- 9-10: Comprehensive and well-supported; safe to act on
+- 7-8: Mostly reliable with minor gaps; suitable for most purposes
+- 5-6: Noticeable gaps or weak sourcing; verify key claims independently
+- 1-4: Significant limitations; further research strongly recommended
 
 **Always write your review in the same language as the original query.**
 
 Provide your review in **JSON format** with the following keys:
-- "score": integer (1-10, where 10 is the best)
-- "strengths": string (in the same language as the query)
-- "weaknesses": string (in the same language as the query)
+- "score": integer (1-10)
+- "strengths": string — bullet-point list of trusted/well-supported aspects (in the same language as the query)
+- "weaknesses": string — bullet-point list of limitations and caveats the reader should be aware of (in the same language as the query)
 Ensure the output is valid JSON and nothing else.
 """

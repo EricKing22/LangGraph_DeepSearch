@@ -36,7 +36,11 @@ async def review(state: Review):
     structured_llm = llm.with_structured_output(Review)
     try:
         feedback = await structured_llm.ainvoke(prompt)
-        message = f"Review feedback:\n\n**Score**={feedback.score},\n**Strengths**={feedback.strengths},\n**Weaknesses**={feedback.weaknesses}"
+        message = (
+            f"Reliability Score: {feedback.score}/10\n\n"
+            f"**Trusted aspects:**\n{feedback.strengths}\n\n"
+            f"**Limitations:**\n{feedback.weaknesses}"
+        )
     except Exception as e:
         message = f"Error during review: {str(e)}"
         feedback = Review(score=0, strengths="N/A", weaknesses="Error during review")

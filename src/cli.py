@@ -122,6 +122,9 @@ async def run_search(args, thread_id):
     initial_state = {"query": args.query} if args.query else None
     auto_approve = args.no_feedback
 
+    # Nodes whose AIMessage output is shown in the final section — skip during streaming
+    _FINAL_OUTPUT_NODES = {"summarise"}
+
     async for update in graph.astream(initial_state, thread, stream_mode="updates"):
         for node_name, node_update in update.items():
             if args.verbose:
@@ -130,7 +133,8 @@ async def run_search(args, thread_id):
                 for msg in node_update["messages"]:
                     if hasattr(msg, "content") and msg.content:
                         if hasattr(msg, "type") and msg.type == "ai":
-                            print(f"\n🤖 [{node_name}] {msg.content}")
+                            if node_name not in _FINAL_OUTPUT_NODES:
+                                print(f"\n🤖 [{node_name}] {msg.content}")
             if args.verbose and "recalled_notes" in node_update:
                 notes = node_update["recalled_notes"]
                 if notes:
@@ -169,7 +173,8 @@ async def run_search(args, thread_id):
                     for msg in node_update["messages"]:
                         if hasattr(msg, "content") and msg.content:
                             if hasattr(msg, "type") and msg.type == "ai":
-                                print(f"\n🤖 [{node_name}] {msg.content}")
+                                if node_name not in _FINAL_OUTPUT_NODES:
+                                    print(f"\n🤖 [{node_name}] {msg.content}")
 
         state = await graph.aget_state(thread)
 
@@ -188,15 +193,15 @@ async def run_search(args, thread_id):
         else:
             print(summary_content)
 
-    # Always show review score when available
+    # Always show review score and trust analysis when available
     if "score" in result and result["score"]:
         score = result["score"]
         bar = "█" * score + "░" * (10 - score)
-        print(f"\n⭐ Review Score: {score}/10  [{bar}]")
+        print(f"\n⭐ Reliability Score: {score}/10  [{bar}]")
         if result.get("strengths"):
-            print(f"💪 Strengths  : {result['strengths']}")
+            print(f"\n✅ Trusted aspects:\n{result['strengths']}")
         if result.get("weaknesses"):
-            print(f"⚠️  Weaknesses : {result['weaknesses']}")
+            print(f"\n⚠️  Limitations:\n{result['weaknesses']}")
 
     if "sources" in result and result["sources"]:
         sources_list = result["sources"]
