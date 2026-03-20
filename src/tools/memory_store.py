@@ -32,6 +32,7 @@ MEMORY_FILE = MEMORY_DIR / "memories.json"
 
 # ── Low-level file I/O ────────────────────────────────────────────────────────
 
+
 def _load() -> List[Dict]:
     if not MEMORY_FILE.exists():
         return []
@@ -53,6 +54,7 @@ def _save(memories: List[Dict]) -> None:
 
 
 # ── Public write API ──────────────────────────────────────────────────────────
+
 
 def save_memory(lesson: str, task_query: str) -> str:
     """
@@ -79,6 +81,7 @@ def save_memory(lesson: str, task_query: str) -> str:
 
 
 # ── Search helpers ────────────────────────────────────────────────────────────
+
 
 def _keyword_score(query: str, memory: Dict) -> int:
     """Simple keyword overlap score (no embedding server required)."""
@@ -136,6 +139,7 @@ def list_all_memories() -> List[Dict]:
 
 # ── LangChain tools (progressive-disclosure interface) ────────────────────────
 
+
 class SearchMemoriesInput(BaseModel):
     query: str = Field(description="Topic or task description to search memory for")
 
@@ -163,7 +167,9 @@ def search_memories(query: str) -> str:
 
 
 class GetMemoryInput(BaseModel):
-    memory_id: str = Field(description="The memory ID (8-char string) from search_memories")
+    memory_id: str = Field(
+        description="The memory ID (8-char string) from search_memories"
+    )
 
 
 @tool(args_schema=GetMemoryInput)

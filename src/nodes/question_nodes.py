@@ -64,7 +64,6 @@ async def plan(state: Plan):
     questions = state.get("questions", [])
     human_feedback = state.get("human_feedback", "")
     score = state.get("score", None)
-    recalled_notes = state.get("recalled_notes", [])
 
     class Sub_Questions(BaseModel):
         questions: List[str] = Field(
@@ -111,6 +110,7 @@ async def plan(state: Plan):
 
     # Execute tool calls in a loop — LLM may chain search_memories → get_memory
     from langgraph.prebuilt import ToolNode
+
     tool_node = ToolNode(tools)
     while hasattr(tool_response, "tool_calls") and tool_response.tool_calls:
         messages.append(tool_response)
@@ -179,11 +179,18 @@ def should_break_query(state: Plan):
 
     # Check iteration limit
     feedback_count = state.get("feedback_count", 0)
-    if config.MAX_BREAK_QUESTIONS_ITERATIONS != -1 and feedback_count >= config.MAX_BREAK_QUESTIONS_ITERATIONS:
-        logger.debug(f"Reached maximum feedback iterations ({feedback_count}). Forcing search.")
+    if (
+        config.MAX_BREAK_QUESTIONS_ITERATIONS != -1
+        and feedback_count >= config.MAX_BREAK_QUESTIONS_ITERATIONS
+    ):
+        logger.debug(
+            f"Reached maximum feedback iterations ({feedback_count}). Forcing search."
+        )
         return map_search(state)
 
-    logger.debug(f"User provided feedback, routing back to plan (iteration {feedback_count})")
+    logger.debug(
+        f"User provided feedback, routing back to plan (iteration {feedback_count})"
+    )
     return "plan"
 
 
@@ -218,10 +225,15 @@ def human_feedback(state: Plan):
 
     questions_str = "\n".join(f"{i + 1}. {q}" for i, q in enumerate(questions))
     if feedback_count <= 1 or not existing_plan_b:
-        plan_content = f"### Iteration {feedback_count} - Human Feedback:\n{feedback}\n\n"
+        plan_content = (
+            f"### Iteration {feedback_count} - Human Feedback:\n{feedback}\n\n"
+        )
         plan_content += f"#### Questions:\n{questions_str}"
     else:
-        plan_content = existing_plan_b + f"\n\n### Iteration {feedback_count} - Human Feedback:\n{feedback}\n\n"
+        plan_content = (
+            existing_plan_b
+            + f"\n\n### Iteration {feedback_count} - Human Feedback:\n{feedback}\n\n"
+        )
         plan_content += f"#### Questions:\n{questions_str}"
 
     return {

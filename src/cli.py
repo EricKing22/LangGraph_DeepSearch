@@ -12,6 +12,7 @@ from src.tools.memory_store import list_all_memories, MEMORY_FILE
 
 # ── Utility commands ──────────────────────────────────────────────────────────
 
+
 def show_config():
     """Display the active runtime configuration."""
     print("\n⚙️  Active Configuration")
@@ -33,16 +34,28 @@ def show_config():
     if app_config.ARXIV_SEARCH_ENABLED:
         sources.append("arxiv")
     print(f"  Search Sources    : {', '.join(sources)}")
-    print(f"  Tavily API Key    : {'✓ set' if app_config.TAVILY_API_KEY else '✗ missing'}")
-    print(f"  HuggingFace Search: {'enabled' if app_config.HUGGINGFACE_SEARCH_ENABLED else 'disabled'}")
+    print(
+        f"  Tavily API Key    : {'✓ set' if app_config.TAVILY_API_KEY else '✗ missing'}"
+    )
+    print(
+        f"  HuggingFace Search: {'enabled' if app_config.HUGGINGFACE_SEARCH_ENABLED else 'disabled'}"
+    )
     if app_config.HUGGINGFACE_SEARCH_ENABLED:
         print(f"  HF Search Types   : {', '.join(app_config.HUGGINGFACE_SEARCH_TYPES)}")
-        print(f"  HF Token          : {'✓ set' if app_config.HUGGINGFACE_TOKEN else '✗ not set (public only)'}")
-    print(f"  arXiv Search      : {'enabled' if app_config.ARXIV_SEARCH_ENABLED else 'disabled'}")
-    print(f"  GitHub Search     : {'enabled' if app_config.GITHUB_SEARCH_ENABLED else 'disabled'}")
+        print(
+            f"  HF Token          : {'✓ set' if app_config.HUGGINGFACE_TOKEN else '✗ not set (public only)'}"
+        )
+    print(
+        f"  arXiv Search      : {'enabled' if app_config.ARXIV_SEARCH_ENABLED else 'disabled'}"
+    )
+    print(
+        f"  GitHub Search     : {'enabled' if app_config.GITHUB_SEARCH_ENABLED else 'disabled'}"
+    )
     if app_config.GITHUB_SEARCH_ENABLED:
         print(f"  GitHub Types      : {', '.join(app_config.GITHUB_SEARCH_TYPES)}")
-        print(f"  GitHub Token      : {'✓ set (code search enabled)' if app_config.GITHUB_TOKEN else '✗ not set (repos + issues only)'}")
+        print(
+            f"  GitHub Token      : {'✓ set (code search enabled)' if app_config.GITHUB_TOKEN else '✗ not set (repos + issues only)'}"
+        )
 
     # Search params
     print(f"  Max Sub-Questions : {app_config.MAX_SUB_QUESTIONS}")
@@ -50,7 +63,9 @@ def show_config():
     print(f"  Max Review Loops  : {app_config.MAX_SUMMARISE_ITERATIONS}")
 
     # Learning
-    print(f"  Self-Learning     : {'enabled' if app_config.ENABLE_LEARNING else 'disabled'}")
+    print(
+        f"  Self-Learning     : {'enabled' if app_config.ENABLE_LEARNING else 'disabled'}"
+    )
     print(f"  Memory File       : {MEMORY_FILE}")
     memories = list_all_memories()
     print(f"  Lessons Stored    : {len(memories)}")
@@ -89,6 +104,7 @@ def show_memory():
 
 # ── Core search runner ────────────────────────────────────────────────────────
 
+
 async def run_search(args, thread_id):
     """Async function to run the search graph"""
     # Compile graph — no Store needed; memory is file-based (memory_store.py)
@@ -107,7 +123,9 @@ async def run_search(args, thread_id):
             search_sources.append("github")
 
     # Resolve max sub-questions (CLI flag > env config)
-    max_questions = args.max_questions if args.max_questions else app_config.MAX_SUB_QUESTIONS
+    max_questions = (
+        args.max_questions if args.max_questions else app_config.MAX_SUB_QUESTIONS
+    )
 
     thread = {
         "configurable": {
@@ -175,7 +193,9 @@ async def run_search(args, thread_id):
                 None, lambda: input("\nYour feedback: ").strip()
             )
 
-        async for update in graph.astream(Command(resume=feedback), thread, stream_mode="updates"):
+        async for update in graph.astream(
+            Command(resume=feedback), thread, stream_mode="updates"
+        ):
             for node_name, node_update in update.items():
                 if args.verbose:
                     print(f"🔄 Executing node: {node_name}")
@@ -251,6 +271,7 @@ async def run_search(args, thread_id):
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+
 def main():
     parser = argparse.ArgumentParser(
         description="DeepSearch - AI-powered deep research with human-in-the-loop and self-learning",
@@ -286,7 +307,7 @@ Examples:
         choices=["web", "hf", "arxiv", "github"],
         metavar="SOURCE",
         help="Search backends: web (Tavily), hf (HuggingFace), arxiv, github. "
-             "Defaults to env config. Example: --sources web github arxiv",
+        "Defaults to env config. Example: --sources web github arxiv",
     )
     parser.add_argument(
         "--max-questions",
@@ -302,7 +323,8 @@ Examples:
 
     # Output
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Show detailed execution information including node steps and sources",
     )
@@ -376,6 +398,7 @@ Examples:
         print(f"\n\n❌ Error occurred: {str(e)}")
         if args.verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 

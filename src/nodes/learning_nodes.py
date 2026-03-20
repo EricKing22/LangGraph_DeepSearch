@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
-from langchain.messages import SystemMessage, AIMessage
-from src.state import LearningState, RecallState
+from langchain.messages import SystemMessage
+from src.state import LearningState
 from src.llm import report_llm  # Use same model as summarise
 from src.tools.memory_store import save_memory
 from src.prompts import WRITE_NOTES_PROMPT

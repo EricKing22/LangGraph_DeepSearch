@@ -138,7 +138,7 @@ def _search_issues(query: str, limit: int) -> List[Dict[str, str]]:
 
     results = []
     for issue in items:
-        labels = ", ".join(l["name"] for l in issue.get("labels", [])[:5]) or "N/A"
+        labels = ", ".join(lb["name"] for lb in issue.get("labels", [])[:5]) or "N/A"
         kind = "Pull Request" if "pull_request" in issue else "Issue"
         body_preview = (issue.get("body") or "")[:300].replace("\n", " ").strip()
         content = (
@@ -201,7 +201,9 @@ def search_github_impl(
 
 class GitHubSearchInput(BaseModel):
     query: str = Field(description="Search query for GitHub")
-    max_results: int = Field(default=5, description="Maximum number of results to return")
+    max_results: int = Field(
+        default=5, description="Maximum number of results to return"
+    )
     search_types: List[Literal["repos", "code", "issues"]] = Field(
         default=["repos", "issues"],
         description="Types of GitHub content to search: repos, code (requires token), issues",

@@ -40,7 +40,9 @@ def search_arxiv_impl(
             "sortOrder": "descending",
         }
 
-        resp = requests.get(_ARXIV_API_URL, params=params, timeout=config.SEARCH_TIMEOUT)
+        resp = requests.get(
+            _ARXIV_API_URL, params=params, timeout=config.SEARCH_TIMEOUT
+        )
         resp.raise_for_status()
 
         ns = {
@@ -56,8 +58,16 @@ def search_arxiv_impl(
             summary_el = entry.find("atom:summary", ns)
             id_el = entry.find("atom:id", ns)
 
-            title = title_el.text.strip().replace("\n", " ") if title_el is not None else "N/A"
-            abstract = summary_el.text.strip().replace("\n", " ")[:600] if summary_el is not None else ""
+            title = (
+                title_el.text.strip().replace("\n", " ")
+                if title_el is not None
+                else "N/A"
+            )
+            abstract = (
+                summary_el.text.strip().replace("\n", " ")[:600]
+                if summary_el is not None
+                else ""
+            )
             paper_url = id_el.text.strip() if id_el is not None else ""
 
             # Derive clean arXiv ID for the URL
@@ -106,7 +116,9 @@ def search_arxiv_impl(
 
 class ArxivSearchInput(BaseModel):
     query: str = Field(description="Search query for arXiv papers")
-    max_results: int = Field(default=5, description="Maximum number of papers to return")
+    max_results: int = Field(
+        default=5, description="Maximum number of papers to return"
+    )
 
 
 @tool(args_schema=ArxivSearchInput)

@@ -46,7 +46,9 @@ def search_huggingface_impl(
         try:
             from huggingface_hub import list_models
 
-            for model in list_models(search=query, limit=per_type, sort="downloads", token=token):
+            for model in list_models(
+                search=query, limit=per_type, sort="downloads", token=token
+            ):
                 tags = ", ".join((model.tags or [])[:5]) or "N/A"
                 results.append(
                     {
@@ -69,7 +71,9 @@ def search_huggingface_impl(
         try:
             from huggingface_hub import list_datasets
 
-            for ds in list_datasets(search=query, limit=per_type, sort="downloads", token=token):
+            for ds in list_datasets(
+                search=query, limit=per_type, sort="downloads", token=token
+            ):
                 tags = ", ".join((ds.tags or [])[:5]) or "N/A"
                 results.append(
                     {
@@ -92,7 +96,9 @@ def search_huggingface_impl(
         try:
             from huggingface_hub import list_spaces
 
-            for space in list_spaces(search=query, limit=per_type, sort="likes", token=token):
+            for space in list_spaces(
+                search=query, limit=per_type, sort="likes", token=token
+            ):
                 tags = ", ".join((space.tags or [])[:5]) or "N/A"
                 results.append(
                     {
@@ -140,13 +146,17 @@ def search_huggingface_impl(
         except Exception as e:
             logger.debug(f"HuggingFace papers search error: {e}")
 
-    logger.debug(f"HuggingFace search '{query}': {len(results)} results across {active_types}")
+    logger.debug(
+        f"HuggingFace search '{query}': {len(results)} results across {active_types}"
+    )
     return results[:max_results]
 
 
 class HuggingFaceSearchInput(BaseModel):
     query: str = Field(description="Search query for HuggingFace Hub")
-    max_results: int = Field(default=5, description="Maximum number of results to return")
+    max_results: int = Field(
+        default=5, description="Maximum number of results to return"
+    )
     search_types: List[Literal["models", "datasets", "spaces", "papers"]] = Field(
         default=["models", "datasets", "spaces", "papers"],
         description="Types of HuggingFace content to search",
