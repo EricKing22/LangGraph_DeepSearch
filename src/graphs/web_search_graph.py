@@ -1,6 +1,4 @@
 from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.store.memory import InMemoryStore
 from src.state import WebSearchState
 from src.nodes.question_nodes import (
     plan,
@@ -88,9 +86,6 @@ builder.add_conditional_edges("review", is_review_finished, ["plan", "summarise"
 # Learn subgraph always goes to END (it runs async)
 builder.add_edge("learn", END)
 
-# Compile
-checkpointer = MemorySaver()
-store = InMemoryStore()
-graph = builder.compile(
-    checkpointer=checkpointer, store=store, interrupt_before=["human_feedback"]
-)
+# Compile without checkpointer/store — langgraph dev provides these at runtime.
+# For CLI usage, compile via builder with checkpointer/store separately.
+graph = builder.compile()
