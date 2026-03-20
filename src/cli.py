@@ -3,7 +3,52 @@ import sys
 import uuid
 import asyncio
 from datetime import datetime
-from .graphs.web_search_graph import graph
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.store.memory import InMemoryStore
+from langgraph.types import Command
+from .graphs.web_search_graph import builder
+from src import config as app_config
+
+
+# ── Utility commands ──────────────────────────────────────────────────────────
+
+def show_config():
+    """Display the active runtime configuration."""
+    print("\n⚙️  Active Configuration")
+    print("=" * 60)
+
+    # LLM
+    llm_provider = "OpenAI"
+    if app_config.QWEN_API_KEY:
+        llm_provider = "Qwen"
+    elif app_config.MINMAX_API_KEY:
+        llm_provider = "MiniMax"
+    print(f"  LLM Provider      : {llm_provider}")
+    print(f"  OpenAI Model      : {app_config.OPENAI_MODEL}")
+
+    # Search sources
+    sources = ["web"]
+    if app_config.HUGGINGFACE_SEARCH_ENABLED:
+        sources.append("hf")
+    if app_config.ARXIV_SEARCH_ENABLED:
+        sources.append("arxiv")
+    print(f"  Search Sources    : {', '.join(sources)}")
+    print(f"  Tavily API Key    : {'✓ set' if app_config.TAVILY_API_KEY else '✗ missing'}")
+    print(f"  HuggingFace Search: {'enabled' if app_config.HUGGINGFACE_SEARCH_ENABLED else 'disabled'}")
+    if app_config.HUGGINGFACE_SEARCH_ENABLED:
+        print(f"  HF Search Types   : {', '.join(app_config.HUGGINGFACE_SEARCH_TYPES)}")
+        print(f"  HF Token          : {'✓ set' if app_config.HUGGINGFACE_TOKEN else '✗ not set (public only)'}")
+    print(f"  arXiv Search      : {'enabled' if app_config.ARXIV_SEARCH_ENABLED else 'disabled'}")
+
+    # Search params
+    print(f"  Max Sub-Questions : {app_config.MAX_SUB_QUESTIONS}")
+    print(f"  Max Search Results: {app_config.MAX_SEARCH_RESULTS}")
+    print(f"  Max Review Loops  : {app_config.MAX_SUMMARISE_ITERATIONS}")
+
+    # Learning
+    print(f"  Self-Learning     : {'enabled' if app_config.ENABLE_LEARNING else 'disabled'}")
+    print(f"  Debug Mode        : {'enabled' if app_config.DEBUG else 'disabled'}")
+    print("=" * 60 + "\n")
 
 
 def list_threads():
@@ -25,121 +70,106 @@ def show_memory():
     print("=" * 60 + "\n")
 
 
+# ── Core search runner ────────────────────────────────────────────────────────
+
 async def run_search(args, thread_id):
     """Async function to run the search graph"""
-    thread = {"configurable": {"thread_id": thread_id}}
+    # Compile graph with checkpointer and store for CLI usage
+    graph = builder.compile(
+        checkpointer=MemorySaver(),
+        store=InMemoryStore(),
+    )
 
-    if args.verbose:
-        print(f"🔍 Processing query: {args.query}")
-        print(f"🆔 Thread ID: {thread_id}\n")
+    # Resolve active search sources (CLI flag > env config)
+    if args.sources:
+        search_sources = args.sources
     else:
-        sys.stdout.write("\r🔍 Processing query ...\n")
+        search_sources = ["web"]
+        if app_config.HUGGINGFACE_SEARCH_ENABLED:
+            search_sources.append("hf")
+        if app_config.ARXIV_SEARCH_ENABLED:
+            search_sources.append("arxiv")
+
+    # Resolve max sub-questions (CLI flag > env config)
+    max_questions = args.max_questions if args.max_questions else app_config.MAX_SUB_QUESTIONS
+
+    thread = {
+        "configurable": {
+            "thread_id": thread_id,
+            "search_sources": search_sources,
+            "max_sub_questions": max_questions,
+        }
+    }
+
+    # Print startup banner
+    sources_label = " + ".join(s.upper() for s in search_sources)
+    if args.verbose:
+        print(f"🔍 Query      : {args.query}")
+        print(f"🆔 Thread ID  : {thread_id}")
+        print(f"🌐 Sources    : {sources_label}")
+        print(f"❓ Max Qs     : {max_questions}")
+        print()
+    else:
+        sys.stdout.write(f"\r🔍 Processing query ... [{sources_label}]\n")
         sys.stdout.flush()
 
-    # Initial invocation - will stop at human_feedback interrupt unless --no-feedback
     initial_state = {"query": args.query} if args.query else None
+    auto_approve = args.no_feedback
 
     async for update in graph.astream(initial_state, thread, stream_mode="updates"):
-        # update is a dict with node_name as key and state updates as value
         for node_name, node_update in update.items():
             if args.verbose:
                 print(f"🔄 Executing node: {node_name}")
-
-            # Print AI messages as they come from node updates
             if "messages" in node_update and node_update["messages"]:
                 for msg in node_update["messages"]:
                     if hasattr(msg, "content") and msg.content:
-                        # Only print if it's a new message
-                        if hasattr(msg, "type"):
-                            if msg.type == "ai":
-                                if not args.verbose:
-                                    sys.stdout.write("\r✓ Query processed!     \n")
-                                    sys.stdout.flush()
-                                print(f"\n🤖 [{node_name}] {msg.content}")
-
-            # Show recalled notes if verbose
+                        if hasattr(msg, "type") and msg.type == "ai":
+                            print(f"\n🤖 [{node_name}] {msg.content}")
             if args.verbose and "recalled_notes" in node_update:
                 notes = node_update["recalled_notes"]
                 if notes:
                     print(f"💭 Recalled {len(notes)} past experience(s)")
 
-    # Check if we're at an interrupt point
+    # Check for interrupt
     state = await graph.aget_state(thread)
 
-    # Handle human feedback loop
-    if args.no_feedback:
-        # Skip human feedback and auto-approve
-        if state.next and "human_feedback" in state.next:
+    # Handle interrupt loop — interrupt() pauses the graph, resume with Command(resume=)
+    while state.next:
+        interrupt_prompt = None
+        for task in state.tasks:
+            if hasattr(task, "interrupts") and task.interrupts:
+                interrupt_prompt = task.interrupts[0].value
+                break
+
+        if interrupt_prompt is None:
+            break
+
+        if auto_approve:
             if args.verbose:
                 print("\n⚡ Auto-feedback mode: Proceeding with generated questions\n")
-            from langchain_core.messages import HumanMessage
-
-            await graph.aupdate_state(
-                thread,
-                {
-                    "messages": [
-                        HumanMessage(content="The questions look good, please proceed.")
-                    ]
-                },
-            )
-
-            # Continue execution
-            async for update in graph.astream(None, thread, stream_mode="updates"):
-                for node_name, node_update in update.items():
-                    if args.verbose:
-                        print(f"🔄 Executing node: {node_name}")
-                    if "messages" in node_update and node_update["messages"]:
-                        for msg in node_update["messages"]:
-                            if hasattr(msg, "content") and msg.content:
-                                if hasattr(msg, "type") and msg.type == "ai":
-                                    print(f"\n🤖 [{node_name}] {msg.content}")
-            state = await graph.aget_state(thread)
-    else:
-        # Normal interactive feedback loop
-        while state.next and "human_feedback" in state.next:
-            # Get human feedback
-            print("\n💬 Please provide feedback on the sub-questions:")
-            print("(Press Enter with no input to proceed as-is)")
-
-            # Run input in executor to avoid blocking the event loop
+            feedback = ""
+        else:
+            print(f"\n{interrupt_prompt}")
             loop = asyncio.get_event_loop()
             feedback = await loop.run_in_executor(
                 None, lambda: input("\nYour feedback: ").strip()
             )
 
-            if not feedback:
-                feedback = "The questions look good, please proceed."
+        async for update in graph.astream(Command(resume=feedback), thread, stream_mode="updates"):
+            for node_name, node_update in update.items():
+                if args.verbose:
+                    print(f"🔄 Executing node: {node_name}")
+                if "messages" in node_update and node_update["messages"]:
+                    for msg in node_update["messages"]:
+                        if hasattr(msg, "content") and msg.content:
+                            if hasattr(msg, "type") and msg.type == "ai":
+                                print(f"\n🤖 [{node_name}] {msg.content}")
 
-            print(f"\n✓ Received feedback: {feedback}\n")
+        state = await graph.aget_state(thread)
 
-            # Update state with human feedback message and resume
-            from langchain_core.messages import HumanMessage
-
-            # First, update the state with the human feedback message
-            await graph.aupdate_state(
-                thread, {"messages": [HumanMessage(content=feedback)]}
-            )
-
-            # Then resume from the interrupt (pass None to continue)
-            async for update in graph.astream(None, thread, stream_mode="updates"):
-                # update is a dict with node_name as key and state updates as value
-                for node_name, node_update in update.items():
-                    if args.verbose:
-                        print(f"🔄 Executing node: {node_name}")
-                    # Print AI messages as they come from node updates
-                    if "messages" in node_update and node_update["messages"]:
-                        for msg in node_update["messages"]:
-                            if hasattr(msg, "content") and msg.content:
-                                if hasattr(msg, "type") and msg.type == "ai":
-                                    print(f"\n🤖 [{node_name}] {msg.content}")
-
-            # Check state again for more interrupts
-            state = await graph.aget_state(thread)
-
-    # Get final result
     result = state.values
 
-    # Print final results
+    # ── Final output ──────────────────────────────────────────────────────────
     print("\n" + "=" * 60)
     print("🎯 FINAL SEARCH RESULTS")
     print("=" * 60)
@@ -152,24 +182,41 @@ async def run_search(args, thread_id):
         else:
             print(summary_content)
 
-    # Show review score if available
-    if args.verbose and "score" in result and result["score"]:
-        print(f"\n⭐ Review Score: {result['score']}/10")
+    # Always show review score when available
+    if "score" in result and result["score"]:
+        score = result["score"]
+        bar = "█" * score + "░" * (10 - score)
+        print(f"\n⭐ Review Score: {score}/10  [{bar}]")
         if result.get("strengths"):
-            print(f"💪 Strengths: {result['strengths']}")
+            print(f"💪 Strengths  : {result['strengths']}")
         if result.get("weaknesses"):
-            print(f"⚠️  Weaknesses: {result['weaknesses']}")
+            print(f"⚠️  Weaknesses : {result['weaknesses']}")
 
     if "sources" in result and result["sources"]:
-        print(f"\n📚 Sources consulted: {len(result['sources'])}")
+        sources_list = result["sources"]
+        hf_count = sum(1 for s in sources_list if "[HF" in s.get("title", ""))
+        arxiv_count = sum(1 for s in sources_list if "[arXiv]" in s.get("title", ""))
+        web_count = len(sources_list) - hf_count - arxiv_count
+
+        print(f"\n📚 Sources consulted: {len(sources_list)}", end="")
+        breakdown = []
+        if web_count:
+            breakdown.append(f"{web_count} web")
+        if hf_count:
+            breakdown.append(f"{hf_count} HuggingFace")
+        if arxiv_count:
+            breakdown.append(f"{arxiv_count} arXiv")
+        if breakdown:
+            print(f" ({', '.join(breakdown)})", end="")
+        print()
+
         if args.verbose:
             print("\nSource details:")
-            for i, source in enumerate(result["sources"][:5], 1):  # Show first 5
+            for i, source in enumerate(sources_list[:10], 1):
                 print(
-                    f"  {i}. {source.get('title', 'Untitled')} - {source.get('url', 'No URL')}"
+                    f"  {i}. {source.get('title', 'Untitled')} — {source.get('url', 'No URL')}"
                 )
 
-    # Show learning info if verbose
     if args.verbose:
         if result.get("recalled_notes"):
             print(f"\n💭 Used {len(result['recalled_notes'])} past experience(s)")
@@ -181,39 +228,74 @@ async def run_search(args, thread_id):
     print("\n" + "=" * 60 + "\n")
 
 
+# ── Entry point ───────────────────────────────────────────────────────────────
+
 def main():
     parser = argparse.ArgumentParser(
-        description="DeepSearch - AI-powered deep web search with closed-loop learning",
+        description="DeepSearch - AI-powered deep research with human-in-the-loop and self-learning",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   deepsearch --query "What is LangGraph?"
-  deepsearch --query "Compare Python async frameworks" --thread-id my-research
+  deepsearch --query "Best image generation models" --sources hf
+  deepsearch --query "Compare BERT and GPT" --sources web hf
+  deepsearch --query "Transformer attention mechanisms" --sources web arxiv
+  deepsearch --query "LLM benchmarks" --sources web hf arxiv
   deepsearch --query "Explain quantum computing" --no-feedback
   deepsearch --query "AI safety concerns" --verbose
+  deepsearch --query "LLM fine-tuning" --max-questions 3
+  deepsearch --show-config
   deepsearch --list-threads
   deepsearch --show-memory
         """,
     )
+
+    # Core
     parser.add_argument("-q", "--query", type=str, help="The search query to process")
     parser.add_argument(
         "--thread-id",
         type=str,
         help="Thread ID for conversation tracking (auto-generated if not provided)",
     )
+
+    # Search control
+    parser.add_argument(
+        "--sources",
+        nargs="+",
+        choices=["web", "hf", "arxiv"],
+        metavar="SOURCE",
+        help="Search backends to use: 'web' (Tavily), 'hf' (HuggingFace), 'arxiv' (arXiv). "
+             "Defaults to env config. Example: --sources web hf arxiv",
+    )
+    parser.add_argument(
+        "--max-questions",
+        type=int,
+        metavar="N",
+        help=f"Override max sub-questions per query (default: {app_config.MAX_SUB_QUESTIONS})",
+    )
     parser.add_argument(
         "--no-feedback",
         action="store_true",
-        help="Skip human feedback step and use auto-generated questions",
+        help="Skip human feedback step and auto-approve generated questions",
     )
+
+    # Output
     parser.add_argument(
-        "--verbose",
-        "-v",
+        "--verbose", "-v",
         action="store_true",
-        help="Show detailed execution information",
+        help="Show detailed execution information including node steps and sources",
+    )
+
+    # Utility
+    parser.add_argument(
+        "--show-config",
+        action="store_true",
+        help="Display active configuration and exit",
     )
     parser.add_argument(
-        "--list-threads", action="store_true", help="List all conversation threads"
+        "--list-threads",
+        action="store_true",
+        help="List all conversation threads",
     )
     parser.add_argument(
         "--show-memory",
@@ -231,6 +313,10 @@ Examples:
     args = parser.parse_args()
 
     # Handle utility commands
+    if args.show_config:
+        show_config()
+        return 0
+
     if args.list_threads:
         list_threads()
         return 0
@@ -242,24 +328,22 @@ Examples:
     # Validate that query is provided for search operations
     if not args.query and not args.continue_thread:
         parser.error(
-            "--query is required unless using --list-threads, --show-memory, or --continue"
+            "--query is required unless using --show-config, --list-threads, --show-memory, or --continue"
         )
 
-    # Generate or use provided thread ID
+    # Resolve thread ID
     if args.continue_thread:
         thread_id = args.continue_thread
         print(f"📝 Continuing thread: {thread_id}")
     elif args.thread_id:
         thread_id = args.thread_id
     else:
-        # Auto-generate a meaningful thread ID
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         thread_id = f"search_{timestamp}_{str(uuid.uuid4())[:8]}"
         if args.verbose:
             print(f"🆔 Generated thread ID: {thread_id}")
 
     try:
-        # Run the async search function
         asyncio.run(run_search(args, thread_id))
         return 0
 
@@ -271,7 +355,6 @@ Examples:
         print(f"\n\n❌ Error occurred: {str(e)}")
         if args.verbose:
             import traceback
-
             traceback.print_exc()
         return 1
 

@@ -5,6 +5,7 @@ from src.llm import question_llm as llm
 from langchain.messages import SystemMessage, AIMessage
 from src.tools.search_tool import search_tavily_impl, search_tavily, get_date
 from src.tools.huggingface_tool import search_huggingface_impl
+from src.tools.arxiv_tool import search_arxiv_impl
 from src.prompts import RELEVANCE_CHECK_PROMPT
 from langgraph.prebuilt import ToolNode
 from langchain_core.runnables import RunnableConfig
@@ -78,6 +79,8 @@ def _get_search_sources(config: RunnableConfig) -> list[str]:
     sources = ["web"]  # Tavily web search is always the base default
     if app_config.HUGGINGFACE_SEARCH_ENABLED:
         sources.append("hf")
+    if app_config.ARXIV_SEARCH_ENABLED:
+        sources.append("arxiv")
     return sources
 
 
@@ -87,11 +90,12 @@ async def search_web(state: Search, config: RunnableConfig):
 
     Active search backends are determined by:
       - CLI --sources flag (via RunnableConfig configurable), or
-      - HUGGINGFACE_SEARCH_ENABLED environment variable.
+      - environment variables (HUGGINGFACE_SEARCH_ENABLED, ARXIV_SEARCH_ENABLED).
 
     Supported sources:
-      - "web"  : Tavily web search
-      - "hf"   : HuggingFace Hub (models, datasets, spaces, papers)
+      - "web"   : Tavily web search
+      - "hf"    : HuggingFace Hub (models, datasets, spaces, papers)
+      - "arxiv" : arXiv academic paper search
     """
     query = state.get("query")
     search_sources = _get_search_sources(config)
@@ -157,6 +161,18 @@ async def search_web(state: Search, config: RunnableConfig):
             logger.debug(f"HuggingFace search added {len(hf_results)} results")
         except Exception as e:
             logger.error(f"HuggingFace search failed for '{query}': {e}")
+
+    # ── arXiv search ──────────────────────────────────────────────────────────
+    if "arxiv" in search_sources:
+        try:
+            arxiv_results = search_arxiv_impl(
+                query=query,
+                max_results=app_config.MAX_SEARCH_RESULTS,
+            )
+            results.extend(arxiv_results)
+            logger.debug(f"arXiv search added {len(arxiv_results)} results")
+        except Exception as e:
+            logger.error(f"arXiv search failed for '{query}': {e}")
 
     # ── Relevance filtering ───────────────────────────────────────────────────
     filtered_results = []

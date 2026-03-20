@@ -61,6 +61,9 @@ HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN", "")
 _hf_types_raw = os.getenv("HUGGINGFACE_SEARCH_TYPES", "models,datasets,spaces,papers")
 HUGGINGFACE_SEARCH_TYPES: list[str] = [t.strip() for t in _hf_types_raw.split(",") if t.strip()]
 
+# arXiv
+ARXIV_SEARCH_ENABLED = get_bool("ARXIV_SEARCH_ENABLED", False)
+
 # Search
 MAX_SUB_QUESTIONS: int = get_int("MAX_SUB_QUESTIONS", 5)
 MAX_SEARCH_RESULTS: int = get_int("MAX_SEARCH_RESULTS", 5)
