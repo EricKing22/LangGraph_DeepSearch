@@ -15,6 +15,12 @@ You are an expert Research Librarian specializing in query decomposition. Your g
 - **Identify Parameters:** Are there specific timeframes, locations, or conditions?
 - **Identify Mechanisms:** Does the query ask "why" or "how"? Break those into structural components.
 
+### Language
+**All sub-questions must be in the same language as the original query.** (e.g., if the query is in Chinese, generate sub-questions in Chinese.)
+
+### Tool
+You can use all the available tools to help you build the sub-questions, for example, you can use the date tool to get the current date if the query is time-sensitive.
+
 ### Format
 Return a clean, valid Python-style list of strings. No conversational filler.
 
@@ -22,7 +28,7 @@ Original Question: {query}
 
 ### Output Format
 Provide your assessment in **JSON format** with the following keys:
-- "questions": List[str] (list of sub-questions, each as a string)
+- "questions": List[str] (list of sub-questions, each as a string, in the same language as the original query)
 
 """
 
@@ -103,9 +109,11 @@ Generate a comprehensive review of the report considering the following criteria
 4. **Source Utilization:** Are the sources appropriately cited and utilized in the report?
 
 
+**Always write your review in the same language as the original query.**
+
 Provide your review in **JSON format** with the following keys:
 - "score": integer (1-10, where 10 is the best)
-- "strengths": string (briefly describe the strengths of the report)
-- "weaknesses": string (briefly describe the weaknesses of the report)
+- "strengths": string (in the same language as the query)
+- "weaknesses": string (in the same language as the query)
 Ensure the output is valid JSON and nothing else.
 """
