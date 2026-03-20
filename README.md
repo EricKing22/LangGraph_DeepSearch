@@ -1,6 +1,6 @@
 # LangGraph DeepSearch
 
-Reproducing deep search functionality using LangGraph framework with **Closed-loop Learning System**.
+A powerful **AI-powered deep research agent** built with LangGraph that combines **human-in-the-loop** control, **automatic quality review**, and **self-learning capabilities** to deliver high-quality research results.
 
 > **⚠️ Development Status**: This project is currently under active development. More features and improvements will be added over time.
 
@@ -10,28 +10,49 @@ Reproducing deep search functionality using LangGraph framework with **Closed-lo
 
 *The LangGraph workflow showing the complete search pipeline with conditional edges, human-in-the-loop feedback, and iterative refinement.*
 
-## 🧠 Closed-loop Learning System
+## Key Features
 
-This project implements a **Closed-loop Learning System** that enables the agent to learn from human feedback and improve over time. The system follows three phases:
+### 1. 🔄 Human-in-the-Loop Control
+Full control over the research process with interruptible workflows:
+- **Plan Review**: Review and modify AI-generated sub-questions before execution
+- **Iterative Refinement**: Provide feedback to improve search strategy
+- **Transparent Decision-Making**: See exactly what the agent is planning to search for
 
-### Phase 1: Recall & Plan
-1. **Input**: User submits a task/query
-2. **Store Search**: Agent searches LangGraph Store for relevant past experiences
-3. **Draft Plan**: Agent generates initial sub-questions (Plan A) incorporating recalled lessons
+### 2. 📊 Automatic Quality Review
+Built-in quality assurance with automatic scoring:
+- **Auto-Scoring**: Every summary receives a score (1-10) based on completeness and accuracy
+- **Strengths/Weaknesses Analysis**: Detailed feedback on what's good and what needs improvement
+- **Iterative Improvement**: Low scores trigger automatic re-generation with specific improvement focus
 
-### Phase 2: Human-in-the-loop
-4. **Interrupt**: Workflow pauses to show Plan A to human
-5. **Human Correction**: Human reviews and optionally modifies the plan (Plan B)
-6. **Execute**: Agent executes the search with the final plan
-
-### Phase 3: Reflect & Memorize
-7. **Compare**: After task completion, compare Plan A and Plan B
-8. **Distill**: LLM analyzes differences and extracts actionable lessons
-9. **Store**: Save new lessons to LangGraph Store for future use
+### 3. 🧠 Self-Learning System (Closed-loop Learning)
+The agent learns from every interaction to improve over time:
+- **Recall Past Experiences**: Before planning, the agent recalls relevant lessons from previous tasks
+- **Compare Plan A & B**: Analyzes the difference between AI's initial plan and human-modified plan
+- **Extract Actionable Lessons**: LLM distills meaningful insights from human corrections
+- **Persistent Memory**: Stores lessons in LangGraph Store for cross-session learning
 
 **Key Benefit**: Over time, as the agent accumulates lessons, it will generate better initial plans that require less human correction!
 
-**Technical Note**: Learning uses **LangGraph Store** (not Checkpointer) for persistent, cross-session memory. Store saves lessons globally with vector embeddings for semantic search, while Checkpointer only saves per-thread conversation state. The learn subgraph runs asynchronously after task completion to avoid blocking the main workflow.
+### Technical Note
+Learning uses **LangGraph Store** (not Checkpointer) for persistent, cross-session memory. Store saves lessons globally with vector embeddings for semantic search, while Checkpointer only saves per-thread conversation state. The learn subgraph runs asynchronously after task completion to avoid blocking the main workflow.
+
+
+### How the Three Mechanisms Work Together
+
+1. **Before Search (Human-in-the-loop)**
+   - Agent generates Plan A (initial sub-questions)
+   - User reviews and modifies → Plan B
+   - Execution proceeds with Plan B
+
+2. **After Search (Review)**
+   - Agent generates summary and auto-scores it
+   - If score > 7: workflow completes
+   - If score ≤ 7: feedback is used to improve plan
+
+3. **After Completion (Self-Learning)**
+   - Compares Plan A vs Plan B
+   - LLM extracts actionable lesson
+   - Lesson stored for future recall
 
 ## 📚 Why LangGraph?
 
@@ -123,19 +144,26 @@ deepsearch --query "How does quantum computing differ from classical computing?"
 When you run a query via CLI, the following happens:
 
 1. **Query Processing**: Your query is analyzed and decomposed into sub-questions
-2. **Human Feedback** (Interactive): You'll be prompted to review and provide feedback on the generated sub-questions
+2. **Recall Past Lessons** (Self-Learning): Agent searches memory for relevant past experiences
+3. **Human Feedback** (Interactive): You'll be prompted to review and provide feedback on the generated sub-questions
    - Press Enter to proceed with the current questions
    - Provide feedback to refine the questions
-3. **Web Search**: Each sub-question is searched using Tavily API
-4. **Result Synthesis**: Results are compiled into a comprehensive answer with citations
-5. **Quality Review**: The answer is automatically reviewed and scored
-6. **Final Output**: Displays the complete answer with sources
+4. **Web Search**: Each sub-question is searched using Tavily API
+5. **Result Synthesis**: Results are compiled into a comprehensive answer with citations
+6. **Quality Review**: The answer is automatically reviewed and scored
+   - If score ≤ 7: The workflow loops back to improve the plan
+   - If score > 7: The workflow completes
+7. **Self-Learning** (Async): After completion, the agent compares Plan A vs Plan B and extracts lessons
+8. **Final Output**: Displays the complete answer with sources
 
-#### Interactive Feedback Example
+#### Interactive Feedback Example (Human-in-the-Loop)
 
 ```
 🔍 Processing query ...
 ✓ Query processed!
+
+🧠 [recall] Recalled past experiences from memory:
+- When researching comparison topics, always include pricing/cost aspects
 
 🤖 [plan] I'm now going to search for these topics:
 **1**. What is LangSmith and what are its primary features?
@@ -149,6 +177,24 @@ Your feedback: Add a question about pricing differences
 ✓ Received feedback: Add a question about pricing differences
 
 [Processing continues with updated questions...]
+```
+
+#### Review Feedback Example (Quality Assurance)
+
+```
+📊 [review] Quality Review:
+
+**Score**: 6/10
+
+**Strengths**:
+- Good explanation of core concepts
+- Clear comparison structure
+
+**Weaknesses**:
+- Missing pricing information
+- Lacks practical use cases
+
+[Loop back to improve with feedback...]
 ```
 
 #### Output Format
@@ -178,10 +224,11 @@ The CLI provides structured output with:
 
 ### Features
 
-- **Automatic State Management**: LangGraph Cloud handles checkpointing automatically
-- **Multi-turn Conversations**: Each thread maintains conversation history
-- **Human-in-the-Loop**: Support for human feedback during question generation
-- **Iterative Refinement**: Can regenerate sub-questions based on feedback
+- **Human-in-the-Loop**: Full control with interruptible workflow - review and modify AI plans before execution
+- **Automatic Quality Review**: Every summary is scored (1-10) with detailed feedback
+- **Self-Learning**: Agent learns from every interaction and improves over time
+- **Persistent Memory**: Cross-session learning using LangGraph Store
+- **Iterative Refinement**: Low scores trigger automatic re-generation
 - **Source Attribution**: Includes citations to original sources
 
 
