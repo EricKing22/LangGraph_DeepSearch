@@ -8,6 +8,7 @@ from langgraph.graph import END
 from langchain.messages import SystemMessage, HumanMessage, AIMessage
 from src.prompts import BREAK_QUESTIONS_PROMPT, SYNTHESIS_PROMPT
 from src.tools.search_tool import get_date
+from src.tools.memory_store import search_memories, get_memory
 from src import config
 import logging
 
@@ -80,15 +81,6 @@ async def plan(state: Plan):
         )
     ]
 
-    # Incorporate recalled notes from memory (Closed-loop Learning)
-    if recalled_notes:
-        notes_str = "\n".join(f"- {note}" for note in recalled_notes)
-        messages.append(
-            SystemMessage(
-                content=f"[IMPORTANT] Below are the notes retrieved from past failures, please consider in later planning:\n{notes_str}"
-            )
-        )
-
     if questions:
         messages.append(SystemMessage(content=f"Current sub questions: {questions}"))
 
@@ -110,18 +102,22 @@ async def plan(state: Plan):
             )
         )
 
-    # Step 1: Let LLM decide whether to use tools (e.g. get_date)
-    tools = [get_date]
+    # Step 1: Let LLM use tools — memory recall + date — before generating sub-questions.
+    # Progressive disclosure: LLM calls search_memories() for brief previews,
+    # then get_memory(id) for full detail on specific lessons it finds relevant.
+    tools = [search_memories, get_memory, get_date]
     llm_with_tools = llm.bind_tools(tools)
     tool_response = await llm_with_tools.ainvoke(messages)
 
-    # Execute any tool calls and append results to messages
-    if hasattr(tool_response, "tool_calls") and tool_response.tool_calls:
-        from langgraph.prebuilt import ToolNode
-        tool_node = ToolNode(tools)
+    # Execute tool calls in a loop — LLM may chain search_memories → get_memory
+    from langgraph.prebuilt import ToolNode
+    tool_node = ToolNode(tools)
+    while hasattr(tool_response, "tool_calls") and tool_response.tool_calls:
         messages.append(tool_response)
         tool_result = await tool_node.ainvoke({"messages": [tool_response]})
         messages.extend(tool_result.get("messages", []))
+        # Let LLM decide if it needs another tool call (e.g. get_memory after search)
+        tool_response = await llm_with_tools.ainvoke(messages)
 
     # Step 2: Generate structured sub-questions (with tool context if any)
     structured_llm = llm.with_structured_output(Sub_Questions)

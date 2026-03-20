@@ -4,10 +4,10 @@ import uuid
 import asyncio
 from datetime import datetime
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
 from .graphs.web_search_graph import builder
 from src import config as app_config
+from src.tools.memory_store import list_all_memories, MEMORY_FILE
 
 
 # ── Utility commands ──────────────────────────────────────────────────────────
@@ -51,6 +51,9 @@ def show_config():
 
     # Learning
     print(f"  Self-Learning     : {'enabled' if app_config.ENABLE_LEARNING else 'disabled'}")
+    print(f"  Memory File       : {MEMORY_FILE}")
+    memories = list_all_memories()
+    print(f"  Lessons Stored    : {len(memories)}")
     print(f"  Debug Mode        : {'enabled' if app_config.DEBUG else 'disabled'}")
     print("=" * 60 + "\n")
 
@@ -65,12 +68,22 @@ def list_threads():
 
 
 def show_memory():
-    """Show learned lessons from memory store (placeholder - requires store access)"""
-    print("\n🧠 Memory Store")
+    """Display all lessons stored in the persistent memory file."""
+    memories = list_all_memories()
+    print("\n🧠 Long-term Memory Store")
+    print(f"   File: {MEMORY_FILE}")
     print("=" * 60)
-    print("⚠️  Direct memory access requires running within LangGraph context.")
-    print("💡 Tip: Use 'langgraph dev' to inspect the store via LangGraph Studio.")
-    print("📚 Lessons are automatically recalled at the start of each search.")
+    if not memories:
+        print("  No lessons stored yet.")
+        print("  Lessons are saved automatically after each research session")
+        print("  where you modified the AI's suggested sub-questions.")
+    else:
+        print(f"  {len(memories)} lesson(s) stored:\n")
+        for m in memories:
+            print(f"  [{m['id']}] {m['timestamp'][:10]}")
+            print(f"  Task   : {m['task_query']}")
+            print(f"  Lesson : {m['lesson']}")
+            print()
     print("=" * 60 + "\n")
 
 
@@ -78,11 +91,8 @@ def show_memory():
 
 async def run_search(args, thread_id):
     """Async function to run the search graph"""
-    # Compile graph with checkpointer and store for CLI usage
-    graph = builder.compile(
-        checkpointer=MemorySaver(),
-        store=InMemoryStore(),
-    )
+    # Compile graph — no Store needed; memory is file-based (memory_store.py)
+    graph = builder.compile(checkpointer=MemorySaver())
 
     # Resolve active search sources (CLI flag > env config)
     if args.sources:
@@ -231,11 +241,8 @@ async def run_search(args, thread_id):
                     f"  {i}. {source.get('title', 'Untitled')} — {source.get('url', 'No URL')}"
                 )
 
-    if args.verbose:
-        if result.get("recalled_notes"):
-            print(f"\n💭 Used {len(result['recalled_notes'])} past experience(s)")
-        if result.get("lesson_learned"):
-            print("📝 New lesson learned and saved to memory")
+    if args.verbose and result.get("lesson_learned"):
+        print("📝 New lesson learned and saved to memory")
 
     print(f"\n💾 Thread ID: {thread_id}")
     print("💡 Use --continue {thread_id} to continue this conversation")
