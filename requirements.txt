@@ -15,6 +15,10 @@ pydantic-settings>=2.0.0
 # Configuration
 python-dotenv>=1.0.0
 
+# HuggingFace Hub search
+huggingface_hub>=0.20.0
+requests>=2.31.0
+
 # Logging
 # (using built-in logging module)
 

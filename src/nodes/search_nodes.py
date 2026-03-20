@@ -4,8 +4,11 @@ from typing import Dict
 from src.llm import question_llm as llm
 from langchain.messages import SystemMessage, AIMessage
 from src.tools.search_tool import search_tavily_impl, search_tavily, get_date
+from src.tools.huggingface_tool import search_huggingface_impl
 from src.prompts import RELEVANCE_CHECK_PROMPT
 from langgraph.prebuilt import ToolNode
+from langchain_core.runnables import RunnableConfig
+from src import config as app_config
 import logging
 
 logger = logging.getLogger("LangGraph_DeepSearch.search_nodes")
@@ -56,25 +59,55 @@ async def judge_relevance(query: str, search_result: Dict[str, str]) -> bool:
         return True
 
 
-async def search_web(state: Search):
+def _get_search_sources(config: RunnableConfig) -> list[str]:
     """
-    Execute Tavily search for the query and use LLM to filter irrelevant results.
-    LLM can decide to use search tools or other tools as needed.
+    Determine active search sources from configurable overrides or app config defaults.
+
+    Priority:
+      1. 'search_sources' key in configurable (set by CLI --sources flag)
+      2. App-level config flags (HUGGINGFACE_SEARCH_ENABLED, etc.)
+
+    Returns a list such as ["web"], ["hf"], or ["web", "hf"].
+    """
+    configurable = config.get("configurable", {}) if config else {}
+    override = configurable.get("search_sources", None)
+    if override is not None:
+        return list(override)
+
+    # Fall back to environment-level defaults
+    sources = ["web"]  # Tavily web search is always the base default
+    if app_config.HUGGINGFACE_SEARCH_ENABLED:
+        sources.append("hf")
+    return sources
+
+
+async def search_web(state: Search, config: RunnableConfig):
+    """
+    Execute search(es) for the query and use LLM to filter irrelevant results.
+
+    Active search backends are determined by:
+      - CLI --sources flag (via RunnableConfig configurable), or
+      - HUGGINGFACE_SEARCH_ENABLED environment variable.
+
+    Supported sources:
+      - "web"  : Tavily web search
+      - "hf"   : HuggingFace Hub (models, datasets, spaces, papers)
     """
     query = state.get("query")
-    search_results = []
+    search_sources = _get_search_sources(config)
 
-    try:
-        # Define tools and create ToolNode
-        tools = [search_tavily, get_date]
-        tool_node = ToolNode(tools)
+    logger.debug(f"search_web '{query}' with sources: {search_sources}")
 
-        # Try to use LLM with tools (if supported)
-        results = []
+    results = []
+
+    # ── Web search (Tavily) ───────────────────────────────────────────────────
+    if "web" in search_sources:
+        web_results = []
         try:
+            tools = [search_tavily, get_date]
+            tool_node = ToolNode(tools)
             llm_with_tools = llm.bind_tools(tools)
 
-            # Invoke LLM with tools
             ai_message = await llm_with_tools.ainvoke(
                 [
                     SystemMessage(
@@ -83,62 +116,66 @@ async def search_web(state: Search):
                 ]
             )
 
-            # Extract results from tool calls using ToolNode
             if hasattr(ai_message, "tool_calls") and ai_message.tool_calls:
-                # ToolNode automatically executes all tool calls and returns ToolMessages
                 node_result = await tool_node.ainvoke({"messages": [ai_message]})
-
-                # Extract search results from ToolMessages
                 for message in node_result.get("messages", []):
-                    # ToolMessage.content contains the tool's return value
                     if hasattr(message, "name") and message.name == "search_tavily":
                         tool_result = message.content
-                        # search_tavily_impl returns a list of dicts
                         if isinstance(tool_result, list):
-                            results.extend(tool_result)
+                            web_results.extend(tool_result)
                         elif isinstance(tool_result, str):
-                            # If it's a string, it might be an error or serialized result
                             try:
                                 import json
 
                                 parsed = json.loads(tool_result)
                                 if isinstance(parsed, list):
-                                    results.extend(parsed)
+                                    web_results.extend(parsed)
                                 else:
-                                    results.append(parsed)
+                                    web_results.append(parsed)
                             except (json.JSONDecodeError, TypeError, ValueError):
-                                # If can't parse, treat as single result
-                                results.append({"content": tool_result})
+                                web_results.append({"content": tool_result})
                         else:
-                            results.append(tool_result)
+                            web_results.append(tool_result)
         except Exception as tool_error:
-            # If LLM doesn't support tools or bind_tools fails, log and continue to fallback
             logger.debug(f"Tool calling not supported or failed: {str(tool_error)}")
 
-        # Fallback: if LLM didn't call search tool or tool calling failed, call it directly
-        if not results:
-            logger.debug(f"Using direct search implementation for query: {query}")
-            results = search_tavily_impl(query=query)
+        # Fallback: direct call if LLM tool calling yielded nothing
+        if not web_results:
+            logger.debug(f"Using direct Tavily search for query: {query}")
+            web_results = search_tavily_impl(query=query)
 
-        # Use judge_relevance to filter results
-        filtered_results = []
-        for result in results:
-            # Ensure result is a dict with expected structure
-            if isinstance(result, dict):
-                if await judge_relevance(query, result):
-                    filtered_results.append(result)
+        results.extend(web_results)
 
-        logger.debug(
-            f"For query {query}, keeping {len(filtered_results)} out of {len(results)} results\n"
-        )
+    # ── HuggingFace search ────────────────────────────────────────────────────
+    if "hf" in search_sources:
+        try:
+            hf_results = search_huggingface_impl(
+                query=query,
+                max_results=app_config.MAX_SEARCH_RESULTS,
+            )
+            results.extend(hf_results)
+            logger.debug(f"HuggingFace search added {len(hf_results)} results")
+        except Exception as e:
+            logger.error(f"HuggingFace search failed for '{query}': {e}")
 
-        search_results.append({"question": query, "results": filtered_results})
-    except Exception as e:
-        logger.error(f"Search Failed '{query}': {str(e)}")
-        search_results.append({"question": query, "results": [], "error": str(e)})
+    # ── Relevance filtering ───────────────────────────────────────────────────
+    filtered_results = []
+    for result in results:
+        if isinstance(result, dict):
+            if await judge_relevance(query, result):
+                filtered_results.append(result)
 
-    # Track search action with summary of what was searched
-    search_summary = f"Search for: **{query}** (Found {len(search_results[0].get('results', []))} relevant results)"
+    logger.debug(
+        f"For query '{query}': kept {len(filtered_results)}/{len(results)} results"
+    )
+
+    search_results = [{"question": query, "results": filtered_results}]
+    sources_label = " + ".join(s.upper() for s in search_sources)
+    search_summary = (
+        f"[{sources_label}] Search for: **{query}** "
+        f"(Found {len(filtered_results)} relevant results)"
+    )
+
     return {
         "messages": [AIMessage(content=search_summary)],
         "search_results": search_results,
